@@ -25,6 +25,9 @@ export const PLAYER = {
 /** Direction pointing *toward* the sun: upper-left and behind the scene, so shadows fall down-right. */
 export const SUN_DIR = new THREE.Vector3(-0.5, 0.8, -0.3).normalize()
 
+/** Name shown above the player's head. */
+export const PLAYER_NAME = 'solmoria'
+
 export const SKY_COLOR = '#d4e6b4'
 
 export type Quality = 'low' | 'medium' | 'high'

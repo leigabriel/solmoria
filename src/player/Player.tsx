@@ -7,7 +7,7 @@ import { readMove } from '../input/useKeyboard'
 import { sharedUniforms } from '../shaders/materials'
 import { heightAt } from '../world/heightAt'
 import { resolveCollisions } from '../world/scatter'
-import { animateCharacter, createCharacter } from './character'
+import { animateCharacter, createCharacter, disposeCharacter } from './character'
 
 const mv = { x: 0, y: 0, walk: false }
 const damp = THREE.MathUtils.damp
@@ -25,11 +25,7 @@ export function Player() {
     playerState.vel.set(0, 0, 0)
     playerState.speed = 0
     playerState.facing = Math.PI * 0.1
-    return () => {
-      rig.root.traverse((o) => {
-        if (o instanceof THREE.Mesh) o.geometry.dispose()
-      })
-    }
+    return () => disposeCharacter(rig)
   }, [rig])
 
   useFrame((state, rawDt) => {

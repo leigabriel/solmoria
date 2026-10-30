@@ -5,6 +5,8 @@ import type { Quality } from './config'
 const KEY = 'solmoria.quality'
 
 function initialQuality(): Quality {
+  const forced = typeof location !== 'undefined' ? new URLSearchParams(location.search).get('quality') : null
+  if (forced === 'low' || forced === 'medium' || forced === 'high') return forced
   try {
     const saved = localStorage.getItem(KEY)
     if (saved === 'low' || saved === 'medium' || saved === 'high') return saved

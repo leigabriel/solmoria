@@ -5,6 +5,7 @@ import { GodRays } from '../atmosphere/GodRays'
 import { Lighting } from '../atmosphere/Lighting'
 import { Pollen } from '../atmosphere/Pollen'
 import { CameraRig } from '../player/CameraRig'
+import { NameTagDriver } from '../ui/NameTag'
 import { Player } from '../player/Player'
 import { World } from '../world/World'
 import { CAMERA, QUALITY, SKY_COLOR } from './config'
@@ -29,6 +30,7 @@ export function Game() {
       <World />
       <Player />
       <CameraRig />
+      <NameTagDriver />
       {q.godRays && <GodRays />}
       <Pollen />
       <Effects />

@@ -25,29 +25,31 @@ canvas { display: block; touch-action: none; }
 }
 @keyframes mist { 0%, 100% { opacity: 0.25; } 50% { opacity: 0.9; } }
 
-.intro {
-  position: fixed; inset: 0; display: grid; place-items: center; pointer-events: none;
-  background: #213613; animation: intro 1.8s ease 0.3s forwards;
+/* name tag above the player's head: carved-fantasy serif to match the painterly forest world */
+.nametag {
+  font-family: 'Cinzel', 'Trajan Pro', Georgia, serif;
+  font-weight: 700;
+  font-size: 15px;
+  letter-spacing: 0.14em;
+  text-transform: lowercase;
+  font-variant: small-caps;
+  color: #f7efcb;
+  white-space: nowrap;
+  padding: 0 2px 5px;
+  text-shadow: 0 0 2px #1b2a0f, 0 0 2px #1b2a0f, 0 1px 0 #1b2a0f, 0 -1px 0 #1b2a0f, 1px 0 0 #1b2a0f, -1px 0 0 #1b2a0f, 0 2px 8px rgba(20, 32, 12, 0.7);
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 4;
+  will-change: transform;
+  pointer-events: none;
+  visibility: hidden;
 }
-.intro h1 { margin: 0; color: var(--ui); font-weight: 600; letter-spacing: 0.35em; font-size: clamp(28px, 7vw, 56px); text-transform: uppercase; }
-@keyframes intro { to { opacity: 0; visibility: hidden; } }
-
-.hint {
-  position: fixed; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom)); transform: translateX(-50%);
-  padding: 8px 16px; border-radius: 999px; color: var(--ui); font-size: 14px;
-  background: rgba(20, 32, 12, 0.55); backdrop-filter: blur(6px); pointer-events: none; white-space: nowrap;
+.nametag::after {
+  content: '';
+  position: absolute; left: 12%; right: 12%; bottom: 0; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(247, 239, 203, 0.85), transparent);
 }
-.hint-touch { display: none; }
-@media (pointer: coarse) { .hint-kb { display: none; } .hint-touch { display: inline; } }
-
-.quality {
-  position: fixed; top: calc(12px + env(safe-area-inset-top)); right: calc(12px + env(safe-area-inset-right));
-  display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 10px;
-  color: var(--ui); font-size: 13px; background: rgba(20, 32, 12, 0.55); backdrop-filter: blur(6px); z-index: 10;
-}
-.quality select { background: transparent; color: inherit; border: 1px solid rgba(243, 240, 214, 0.35); border-radius: 6px; padding: 3px 6px; font: inherit; }
-.quality option { color: #111; }
-.fps { position: fixed; top: 12px; left: 12px; color: var(--ui); font: 12px ui-monospace, monospace; background: rgba(0,0,0,.4); padding: 3px 7px; border-radius: 6px; }
 
 /* dynamic joystick */
 .joy-zone { position: fixed; left: 0; top: 0; bottom: 0; width: 62%; touch-action: none; z-index: 5; }
