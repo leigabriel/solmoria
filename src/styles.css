@@ -25,17 +25,14 @@ canvas { display: block; touch-action: none; }
 }
 @keyframes mist { 0%, 100% { opacity: 0.25; } 50% { opacity: 0.9; } }
 
-/* name tag above the player's head: carved-fantasy serif to match the painterly forest world */
+/* name tag above the player's head */
 .nametag {
-  font-family: 'Cinzel', 'Trajan Pro', Georgia, serif;
+  font-family: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
   font-weight: 700;
-  font-size: 15px;
-  letter-spacing: 0.14em;
-  text-transform: lowercase;
-  font-variant: small-caps;
+  font-size: 14px;
+  letter-spacing: 0.06em;
   color: #f7efcb;
   white-space: nowrap;
-  padding: 0 2px 5px;
   text-shadow: 0 0 2px #1b2a0f, 0 0 2px #1b2a0f, 0 1px 0 #1b2a0f, 0 -1px 0 #1b2a0f, 1px 0 0 #1b2a0f, -1px 0 0 #1b2a0f, 0 2px 8px rgba(20, 32, 12, 0.7);
   position: fixed;
   left: 0;
@@ -44,11 +41,6 @@ canvas { display: block; touch-action: none; }
   will-change: transform;
   pointer-events: none;
   visibility: hidden;
-}
-.nametag::after {
-  content: '';
-  position: absolute; left: 12%; right: 12%; bottom: 0; height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(247, 239, 203, 0.85), transparent);
 }
 
 /* dynamic joystick */

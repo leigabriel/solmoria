@@ -105,7 +105,7 @@ export function buildChunk(cx: number, cz: number, q: QualitySettings) {
     for (let i = 0; i < candidates; i++) {
       const x = x0 + rng() * CHUNK_SIZE
       const z = z0 + rng() * CHUNK_SIZE
-      const dens = 0.18 + meadowMask(x, z) * 0.6 + (1 - forestMask(x, z)) * 0.22
+      const dens = Math.min(1, 0.55 + meadowMask(x, z) * 0.35 + (1 - forestMask(x, z)) * 0.2)
       if (rng() < dens) keep.push(x, z, rng(), rng(), rng())
     }
     const n = keep.length / 5
@@ -117,10 +117,10 @@ export function buildChunk(cx: number, cz: number, q: QualitySettings) {
         const r = keep[i * 5 + 2]
         const a = keep[i * 5 + 3]
         const b = keep[i * 5 + 4]
-        const sw = 0.45 + a * 0.4
-        const sh = 0.16 + b * 0.2
+        const sw = 0.9 + a * 0.5
+        const sh = 0.7 + b * 0.5
         setMatrix(mesh, i, x, heightAt(x, z) - 0.02, z, r * Math.PI * 2, sw, sh, sw)
-        _c.setHSL(0.25 + (a - 0.5) * 0.05, 0.6 + b * 0.12, 0.26 + a * 0.12, THREE.SRGBColorSpace)
+        _c.setHSL(0.235 + (a - 0.5) * 0.05, 0.5 + b * 0.1, 0.27 + a * 0.1, THREE.SRGBColorSpace)
         mesh.setColorAt(i, _c)
       }
       group.add(finish(mesh, false, true))

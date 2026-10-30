@@ -44,7 +44,7 @@ export interface QualitySettings {
 }
 
 export const QUALITY: Record<Quality, QualitySettings> = {
-  low: { dpr: 1, shadowMapSize: 1024, chunkRadius: 1, grassDensity: 1.2, bloom: false, smaa: false, godRays: false, pollen: 50 },
-  medium: { dpr: 1.5, shadowMapSize: 2048, chunkRadius: 2, grassDensity: 2.2, bloom: true, smaa: false, godRays: true, pollen: 110 },
-  high: { dpr: 2, shadowMapSize: 3072, chunkRadius: 2, grassDensity: 3.4, bloom: true, smaa: true, godRays: true, pollen: 200 },
+  low: { dpr: 1, shadowMapSize: 1024, chunkRadius: 1, grassDensity: 3.0, bloom: false, smaa: false, godRays: false, pollen: 50 },
+  medium: { dpr: 1.5, shadowMapSize: 2048, chunkRadius: 2, grassDensity: 5.0, bloom: true, smaa: false, godRays: true, pollen: 110 },
+  high: { dpr: 2, shadowMapSize: 3072, chunkRadius: 2, grassDensity: 7.0, bloom: true, smaa: true, godRays: true, pollen: 200 },
 }

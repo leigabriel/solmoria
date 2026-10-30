@@ -126,9 +126,10 @@ export function createGrassMaterial() {
   float flutter = sin(uTime * 2.4 + base.x * 1.7 + base.z * 1.3) * 0.5;
   vec2 dp = base.xz - uPlayer.xz;
   float dl = length(dp);
-  vec2 push = dp / max(dl, 0.001) * smoothstep(1.25, 0.0, dl) * 0.85;
+  float near = smoothstep(1.5, 0.15, dl);
+  vec2 push = dp / max(dl, 0.001) * near * 0.75;
   vec2 disp = uWindDir * (w * 0.32 + 0.10) + vec2(flutter * 0.05) + push;
-  vec3 world = vec3(disp.x, -smoothstep(1.25, 0.0, dl) * 0.2 * vH, disp.y) * bend;
+  vec3 world = vec3(disp.x, -near * 0.28 * vH, disp.y) * bend;
   transformed += inverse(mat3(instanceMatrix)) * world;
   vCS = cloudShadow(base.xz);
 }
@@ -140,7 +141,7 @@ export function createGrassMaterial() {
         '#include <color_fragment>',
         /* glsl */ `
 #include <color_fragment>
-diffuseColor.rgb *= mix(0.42, 1.25, vH) * (1.0 - 0.20 * vCS);
+diffuseColor.rgb *= mix(0.5, 1.15, vH) * (1.0 - 0.20 * vCS);
 `,
       )
       // light blades like the ground (up-facing normal) so both faces shade the same

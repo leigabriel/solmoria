@@ -23,32 +23,44 @@ function lumpy(rx: number, ry: number, rz: number, detail: number, lump: number,
   return g
 }
 
+/**
+ * One tuft = 5 long, curved, tapering blades of different height. Unit height so instance scale sets
+ * the real size. Normals point up so every blade is lit like the ground (painterly, no dark backsides).
+ */
 function grassClump() {
   const pos: number[] = []
   const nor: number[] = []
   const idx: number[] = []
-  const blades = 3
+  const rng = mulberry32(7)
+  const blades = 5
+  const levels = [0, 0.4, 0.75] // widths shrink toward the tip, which is a single vertex at y = 1
+  const widths = [1, 0.88, 0.62]
   for (let b = 0; b < blades; b++) {
-    const a = (b / blades) * Math.PI + b * 0.4
+    const a = rng() * Math.PI * 2
     const c = Math.cos(a)
     const s = Math.sin(a)
-    const ox = Math.cos(b * 2.1) * 0.07
-    const oz = Math.sin(b * 2.1) * 0.07
-    const w = 0.12
-    const lean = 0.18 + b * 0.05
-    const pts: [number, number, number][] = [
-      [-w, 0, 0],
-      [w, 0, 0],
-      [-w * 0.7, 0.55, lean * 0.4],
-      [w * 0.7, 0.55, lean * 0.4],
-      [0, 1, lean],
-    ]
+    const rad = 0.03 + rng() * 0.11
+    const ox = Math.cos(a * 2.3 + b) * rad
+    const oz = Math.sin(a * 2.3 + b) * rad
+    const w = 0.095 + rng() * 0.045
+    const h = 0.72 + rng() * 0.28
+    const lean = 0.12 + rng() * 0.38
     const base = pos.length / 3
-    for (const [x, y, z] of pts) {
-      pos.push(ox + x * c - z * s, y, oz + x * s + z * c)
+    const add = (x: number, y: number, z: number) => {
+      pos.push(ox + x * c - z * s, y * h, oz + x * s + z * c)
       nor.push(0, 1, 0)
     }
-    idx.push(base, base + 1, base + 3, base, base + 3, base + 2, base + 2, base + 3, base + 4)
+    for (let k = 0; k < levels.length; k++) {
+      const y = levels[k]
+      const z = lean * y * y
+      add(-w * widths[k], y, z)
+      add(w * widths[k], y, z)
+    }
+    add(0, 1, lean * 1.15)
+    // quads between level 0-1 and 1-2, then the tip triangle
+    idx.push(base, base + 1, base + 3, base, base + 3, base + 2)
+    idx.push(base + 2, base + 3, base + 5, base + 2, base + 5, base + 4)
+    idx.push(base + 4, base + 5, base + 6)
   }
   const g = new THREE.BufferGeometry()
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3))
