@@ -1,0 +1,37 @@
+import { Canvas } from '@react-three/fiber'
+import { PCFShadowMap } from 'three'
+import { Effects } from '../atmosphere/Effects'
+import { GodRays } from '../atmosphere/GodRays'
+import { Lighting } from '../atmosphere/Lighting'
+import { Pollen } from '../atmosphere/Pollen'
+import { CameraRig } from '../player/CameraRig'
+import { Player } from '../player/Player'
+import { World } from '../world/World'
+import { CAMERA, QUALITY, SKY_COLOR } from './config'
+import { useSettings } from './store'
+
+export function Game() {
+  const quality = useSettings((s) => s.quality)
+  const q = QUALITY[quality]
+  return (
+    // key: switching quality rebuilds the renderer + world cleanly
+    <Canvas
+      key={quality}
+      shadows={{ type: PCFShadowMap }}
+      flat
+      dpr={Math.min(q.dpr, typeof window === 'undefined' ? 1 : window.devicePixelRatio)}
+      gl={{ antialias: !q.smaa && !q.bloom, powerPreference: 'high-performance' }}
+      camera={{ fov: CAMERA.fov, near: 0.5, far: 260, position: [0, 14, 10] }}
+    >
+      <color attach="background" args={[SKY_COLOR]} />
+      <fog attach="fog" args={[SKY_COLOR, 40, 100]} />
+      <Lighting />
+      <World />
+      <Player />
+      <CameraRig />
+      {q.godRays && <GodRays />}
+      <Pollen />
+      <Effects />
+    </Canvas>
+  )
+}
