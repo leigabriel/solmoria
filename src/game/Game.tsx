@@ -9,6 +9,7 @@ import { NameTagDriver } from '../ui/NameTag'
 import { Player } from '../player/Player'
 import { World } from '../world/World'
 import { CAMERA, QUALITY, SKY_COLOR } from './config'
+import { AdaptiveRes } from './AdaptiveRes'
 import { useSettings } from './store'
 
 export function Game() {
@@ -32,6 +33,7 @@ export function Game() {
       <CameraRig />
       <NameTagDriver />
       {q.godRays && <GodRays />}
+      <AdaptiveRes max={Math.min(q.dpr, typeof window === 'undefined' ? 1 : window.devicePixelRatio)} />
       <Pollen />
       <Effects />
     </Canvas>

@@ -5,7 +5,7 @@ import { PLAYER } from '../game/config'
 import { playerState } from '../game/store'
 import { readMove } from '../input/useKeyboard'
 import { sharedUniforms } from '../shaders/materials'
-import { heightAt } from '../world/heightAt'
+import { depthAt, heightAt, WORLD_HALF, world } from '../world/terrainData'
 import { resolveCollisions } from '../world/scatter'
 import { animateCharacter, createCharacter, disposeCharacter } from './character'
 
@@ -21,7 +21,7 @@ export function Player() {
   const rig = useMemo(() => createCharacter(), [])
 
   useEffect(() => {
-    playerState.pos.set(0, heightAt(0, 0), 0)
+    playerState.pos.set(world.spawn.x, heightAt(world.spawn.x, world.spawn.z), world.spawn.z)
     playerState.vel.set(0, 0, 0)
     playerState.speed = 0
     playerState.facing = Math.PI * 0.1
@@ -45,8 +45,20 @@ export function Player() {
     vel.x = damp(vel.x, dirX * target, PLAYER.accel, dt)
     vel.z = damp(vel.z, dirZ * target, PLAYER.accel, dt)
 
-    pos.x += vel.x * dt
-    pos.z += vel.z * dt
+    // deep water blocks movement, shallows slow you down
+    const d0 = depthAt(pos.x, pos.z)
+    const slow = d0 > 0.05 ? 1 - Math.min(0.45, d0 * 0.6) : 1
+    const nx = pos.x + vel.x * dt * slow
+    const nz = pos.z + vel.z * dt * slow
+    if (depthAt(nx, nz) < 1.0) {
+      pos.x = nx
+      pos.z = nz
+    } else if (depthAt(nx, pos.z) < 1.0) pos.x = nx
+    else if (depthAt(pos.x, nz) < 1.0) pos.z = nz
+    else { vel.x = 0; vel.z = 0 }
+    const lim = WORLD_HALF - 6
+    pos.x = Math.max(-lim, Math.min(lim, pos.x))
+    pos.z = Math.max(-lim, Math.min(lim, pos.z))
     resolveCollisions(pos, PLAYER.radius)
     pos.y = damp(pos.y, heightAt(pos.x, pos.z), 18, dt)
 

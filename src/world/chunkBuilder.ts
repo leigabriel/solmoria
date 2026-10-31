@@ -3,234 +3,480 @@ import { CHUNK_SEGMENTS, CHUNK_SIZE, WORLD_SEED, type QualitySettings } from '..
 import { hashInts, mulberry32 } from '../utils/random'
 import { srgb } from '../utils/textures'
 import { assets } from './assets'
-import { heightAt } from './heightAt'
-import { forestMask, getChunkData, meadowMask, type Prop } from './scatter'
+import { forestMask, meadowMask } from './biome'
+import { NO_WATER } from './hydrology'
+import { PropBatch } from './propBatch'
+import { getChunkData } from './scatter'
+import { depthAt, heightAt, shoreAt, siteClearance, slopeAt, VERTS, world, WORLD_HALF } from './terrainData'
+import { DARK_BUSH, FERN_PARTS, PALETTE, PALETTE_KEYS, ROUND_BUSH, TPL, TREE_PARTS, type Part } from './templates'
+import type { Template } from './propBatch'
 
-const _m = new THREE.Matrix4()
-const _q = new THREE.Quaternion()
+const UP = new THREE.Vector3(0, 1, 0)
 const _p = new THREE.Vector3()
 const _s = new THREE.Vector3()
+const _q = new THREE.Quaternion()
 const _e = new THREE.Euler()
+const _base = new THREE.Matrix4()
+const _loc = new THREE.Matrix4()
+const _M = new THREE.Matrix4()
 const _c = new THREE.Color()
-const UP = new THREE.Vector3(0, 1, 0)
 
-function terrainGeometry(cx: number, cz: number) {
+const STEM = srgb(0.26, 0.5, 0.16)
+const BARK = srgb(0.36, 0.24, 0.15)
+
+function setBase(x: number, y: number, z: number, yaw: number, s = 1) {
+  _q.setFromAxisAngle(UP, yaw)
+  _base.compose(_p.set(x, y, z), _q, _s.set(s, s, s))
+}
+
+function put(b: PropBatch, t: Template, lx: number, ly: number, lz: number, sx: number, sy: number, sz: number, rx: number, ry: number, rz: number, color: THREE.Color, stip = 0, emis = 0, moss = 0) {
+  _e.set(rx, ry, rz)
+  _q.setFromEuler(_e)
+  _loc.compose(_p.set(lx, ly, lz), _q, _s.set(sx, sy, sz))
+  _M.multiplyMatrices(_base, _loc)
+  b.add(t, _M, color, stip, emis, moss)
+}
+
+function putParts(b: PropBatch, parts: Part[], v: number) {
+  for (const p of parts) {
+    _M.multiplyMatrices(_base, p.m)
+    b.add(p.t, _M, _c.copy(p.a).lerp(p.b, v), p.stip, p.emis, p.moss)
+  }
+}
+
+// ---------------------------------------------------------------------------------------------- terrain
+function terrainMesh(cx: number, cz: number, ao: Float32Array) {
   const N = CHUNK_SEGMENTS
-  const step = CHUNK_SIZE / N
-  const ox = cx * CHUNK_SIZE
-  const oz = cz * CHUNK_SIZE
-  const pos = new Float32Array((N + 1) * (N + 1) * 3)
-  const nor = new Float32Array((N + 1) * (N + 1) * 3)
-  const idx: number[] = []
-  const e = 0.5
+  const n1 = N + 1
+  const ox = cx * CHUNK_SIZE + WORLD_HALF
+  const oz = cz * CHUNK_SIZE + WORLD_HALF
+  const pos = new Float32Array(n1 * n1 * 3)
+  const nor = new Float32Array(n1 * n1 * 3)
+  const shore = new Float32Array(n1 * n1)
+  const h = world.h
+  const at = (ix: number, iz: number) => h[Math.min(VERTS - 1, Math.max(0, iz)) * VERTS + Math.min(VERTS - 1, Math.max(0, ix))]
   for (let j = 0; j <= N; j++) {
     for (let i = 0; i <= N; i++) {
-      const x = ox + i * step
-      const z = oz + j * step
-      const k = (j * (N + 1) + i) * 3
-      pos[k] = x
-      pos[k + 1] = heightAt(x, z)
-      pos[k + 2] = z
-      // analytic-ish normal -> seamless lighting across chunk borders
-      const nx = heightAt(x - e, z) - heightAt(x + e, z)
-      const nz = heightAt(x, z - e) - heightAt(x, z + e)
-      const l = Math.hypot(nx, 2 * e, nz)
-      nor[k] = nx / l
-      nor[k + 1] = (2 * e) / l
-      nor[k + 2] = nz / l
+      const ix = ox + i
+      const iz = oz + j
+      const k = j * n1 + i
+      pos[k * 3] = ix - WORLD_HALF
+      pos[k * 3 + 1] = h[iz * VERTS + ix]
+      pos[k * 3 + 2] = iz - WORLD_HALF
+      const nx = (at(ix - 1, iz) - at(ix + 1, iz)) * 0.5
+      const nz = (at(ix, iz - 1) - at(ix, iz + 1)) * 0.5
+      const l = Math.hypot(nx, 1, nz)
+      nor[k * 3] = nx / l
+      nor[k * 3 + 1] = 1 / l
+      nor[k * 3 + 2] = nz / l
+      shore[k] = world.shore[iz * VERTS + ix]
     }
   }
+  const idx = new Uint16Array(N * N * 6)
+  let t = 0
   for (let j = 0; j < N; j++) {
     for (let i = 0; i < N; i++) {
-      const a = j * (N + 1) + i
+      const a = j * n1 + i
       const b = a + 1
-      const c = a + (N + 1)
+      const c = a + n1
       const d = c + 1
-      idx.push(a, c, b, b, c, d)
+      idx[t++] = a
+      idx[t++] = c
+      idx[t++] = b
+      idx[t++] = b
+      idx[t++] = c
+      idx[t++] = d
     }
   }
   const g = new THREE.BufferGeometry()
   g.setAttribute('position', new THREE.BufferAttribute(pos, 3))
   g.setAttribute('normal', new THREE.BufferAttribute(nor, 3))
-  g.setIndex(idx)
+  g.setAttribute('aShore', new THREE.BufferAttribute(shore, 1))
+  g.setAttribute('aAO', new THREE.BufferAttribute(ao, 1))
+  g.setIndex(new THREE.BufferAttribute(idx, 1))
   g.computeBoundingSphere()
-  return g
+  const m = new THREE.Mesh(g, assets.terrainMat)
+  m.receiveShadow = true
+  m.userData.own = true
+  return m
 }
 
-function instanced(geo: THREE.BufferGeometry, mat: THREE.Material, count: number) {
-  const mesh = new THREE.InstancedMesh(geo, mat, count)
-  mesh.instanceMatrix.setUsage(THREE.StaticDrawUsage)
-  return mesh
-}
-
-function finish(mesh: THREE.InstancedMesh, cast: boolean, receive: boolean) {
-  mesh.instanceMatrix.needsUpdate = true
-  if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true
-  mesh.castShadow = cast
-  mesh.receiveShadow = receive
-  mesh.computeBoundingSphere()
-  mesh.computeBoundingBox()
-  return mesh
-}
-
-function setMatrix(mesh: THREE.InstancedMesh, i: number, x: number, y: number, z: number, yaw: number, sx: number, sy: number, sz: number) {
-  _q.setFromAxisAngle(UP, yaw)
-  _p.set(x, y, z)
-  _s.set(sx, sy, sz)
-  _m.compose(_p, _q, _s)
-  mesh.setMatrixAt(i, _m)
-}
-
-/** Builds everything that lives in one chunk. Dispose with disposeChunk(). */
-export function buildChunk(cx: number, cz: number, q: QualitySettings) {
-  const group = new THREE.Group()
-  group.name = `chunk ${cx},${cz}`
+/** Bake soft contact shadows of nearby props into per-vertex values (replaces a transparent decal pass). */
+function bakeAO(cx: number, cz: number) {
+  const N = CHUNK_SEGMENTS
+  const n1 = N + 1
+  const ao = new Float32Array(n1 * n1)
   const x0 = cx * CHUNK_SIZE
   const z0 = cz * CHUNK_SIZE
-
-  // --- terrain
-  const ground = new THREE.Mesh(terrainGeometry(cx, cz), assets.terrainMat)
-  ground.receiveShadow = true
-  ground.userData.ownsGeometry = true
-  group.add(ground)
-
-  const data = getChunkData(cx, cz)
-
-  // --- grass tufts (denser in meadow patches, sparse under forest)
-  {
-    const rng = mulberry32(hashInts(cx, cz, WORLD_SEED, 11))
-    const maxDensity = q.grassDensity
-    const candidates = Math.round(CHUNK_SIZE * CHUNK_SIZE * maxDensity)
-    const keep: number[] = []
-    for (let i = 0; i < candidates; i++) {
-      const x = x0 + rng() * CHUNK_SIZE
-      const z = z0 + rng() * CHUNK_SIZE
-      const dens = Math.min(1, 0.55 + meadowMask(x, z) * 0.35 + (1 - forestMask(x, z)) * 0.2)
-      if (rng() < dens) keep.push(x, z, rng(), rng(), rng())
-    }
-    const n = keep.length / 5
-    if (n > 0) {
-      const mesh = instanced(assets.grassGeo, assets.grassMat, n)
-      for (let i = 0; i < n; i++) {
-        const x = keep[i * 5]
-        const z = keep[i * 5 + 1]
-        const r = keep[i * 5 + 2]
-        const a = keep[i * 5 + 3]
-        const b = keep[i * 5 + 4]
-        const sw = 0.9 + a * 0.5
-        const sh = 0.7 + b * 0.5
-        setMatrix(mesh, i, x, heightAt(x, z) - 0.02, z, r * Math.PI * 2, sw, sh, sw)
-        _c.setHSL(0.235 + (a - 0.5) * 0.05, 0.5 + b * 0.1, 0.27 + a * 0.1, THREE.SRGBColorSpace)
-        mesh.setColorAt(i, _c)
-      }
-      group.add(finish(mesh, false, true))
-    }
-  }
-
-  // --- flower clusters (tiny yellow / orange dots in loose groups)
-  {
-    const cell = 6
-    const pts: { x: number; z: number; c: number; sz: number }[] = []
-    const i0 = Math.floor(x0 / cell)
-    const j0 = Math.floor(z0 / cell)
-    const cells = Math.ceil(CHUNK_SIZE / cell)
-    for (let i = i0; i < i0 + cells; i++) {
-      for (let j = j0; j < j0 + cells; j++) {
-        const rng = mulberry32(hashInts(i, j, WORLD_SEED, 404))
-        const cxp = (i + rng() * 1) * cell
-        const czp = (j + rng() * 1) * cell
-        if (cxp < x0 || cxp >= x0 + CHUNK_SIZE || czp < z0 || czp >= z0 + CHUNK_SIZE) continue
-        if (rng() > 0.25 + meadowMask(cxp, czp) * 0.55) continue
-        const kind = rng()
-        const count = 8 + Math.floor(rng() * 12)
-        for (let k = 0; k < count; k++) {
-          const ang = rng() * Math.PI * 2
-          const rad = Math.sqrt(rng()) * (kind < 0.55 ? 1.6 : 1.1)
-          pts.push({ x: cxp + Math.cos(ang) * rad, z: czp + Math.sin(ang) * rad * 0.8, c: kind, sz: 0.8 + rng() * 0.7 })
+  const stamp = (px: number, pz: number, r: number, k: number) => {
+    const i0 = Math.max(0, Math.floor(px - r - x0))
+    const i1 = Math.min(N, Math.ceil(px + r - x0))
+    const j0 = Math.max(0, Math.floor(pz - r - z0))
+    const j1 = Math.min(N, Math.ceil(pz + r - z0))
+    for (let j = j0; j <= j1; j++) {
+      for (let i = i0; i <= i1; i++) {
+        const d = Math.hypot(x0 + i - px, z0 + j - pz) / r
+        if (d < 1) {
+          const v = (1 - d) * (1 - d) * k
+          if (v > ao[j * n1 + i]) ao[j * n1 + i] = v
         }
       }
     }
-    if (pts.length) {
-      const mesh = instanced(assets.flowerGeo, assets.flowerMat, pts.length)
-      pts.forEach((p, i) => {
-        const scale = p.c < 0.55 ? 0.6 * p.sz : 0.95 * p.sz
-        setMatrix(mesh, i, p.x, heightAt(p.x, p.z) + 0.07, p.z, 0, scale, scale, scale)
-        if (p.c < 0.55) _c.setRGB(0.98, 0.86 + (p.sz - 0.8) * 0.1, 0.32, THREE.SRGBColorSpace)
-        else if (p.c < 0.85) _c.setRGB(0.96, 0.52, 0.16, THREE.SRGBColorSpace)
-        else _c.setRGB(0.93, 0.32, 0.22, THREE.SRGBColorSpace)
-        mesh.setColorAt(i, _c)
-      })
-      group.add(finish(mesh, false, false))
+  }
+  for (let dx = -1; dx <= 1; dx++) {
+    for (let dz = -1; dz <= 1; dz++) {
+      const d = getChunkData(cx + dx, cz + dz)
+      for (const t of d.trees) stamp(t.x + 0.3, t.z + 0.3, 2.4 * t.s, 0.95)
+      for (const b of d.bushes) stamp(b.x + 0.2, b.z + 0.2, 1.6 * b.s, 0.7)
+      for (const r of d.rocks) if (r.kind !== 'flat') stamp(r.x + 0.2, r.z + 0.2, 1.3 * r.s, 0.6)
+      for (const c of d.colliders) if (c.r < 0.6) stamp(c.x, c.z, 1.1, 0.35)
     }
   }
+  return ao
+}
 
-  // --- trees: trunk + lumpy oval canopy
-  if (data.trees.length) {
-    const n = data.trees.length
-    const trunks = instanced(assets.trunkGeo, assets.trunkMat, n)
-    const canopies = instanced(assets.treeCanopyGeo, assets.foliageMat, n)
-    const deep = srgb(0.22, 0.40, 0.18)
-    const light = srgb(0.34, 0.50, 0.16)
-    data.trees.forEach((t: Prop, i) => {
-      setMatrix(trunks, i, t.x, t.y - 0.1, t.z, t.r, t.s, t.s, t.s)
-      const w = 0.9 + t.v * 0.35
-      setMatrix(canopies, i, t.x, t.y + 2.55 * t.s, t.z, t.r, t.s * w, t.s * (0.85 + t.v * 0.3), t.s * w)
-      canopies.setColorAt(i, _c.copy(deep).lerp(light, t.v * 0.8))
-    })
-    group.add(finish(trunks, true, true), finish(canopies, true, true))
-  }
-
-  // --- bushes
-  if (data.bushes.length) {
-    const n = data.bushes.length
-    const mesh = instanced(assets.bushGeo, assets.foliageMat, n)
-    const a = srgb(0.40, 0.48, 0.14)
-    const b = srgb(0.30, 0.46, 0.15)
-    data.bushes.forEach((p, i) => {
-      setMatrix(mesh, i, p.x, p.y + 0.55 * p.s, p.z, p.r, p.s, p.s, p.s)
-      mesh.setColorAt(i, _c.copy(a).lerp(b, p.v))
-    })
-    group.add(finish(mesh, true, true))
-  }
-
-  // --- rocks
-  if (data.rocks.length) {
-    const n = data.rocks.length
-    const mesh = instanced(assets.rockGeo, assets.rockMat, n)
-    const a = srgb(0.62, 0.43, 0.22)
-    const b = srgb(0.47, 0.34, 0.20)
-    data.rocks.forEach((p, i) => {
-      _e.set(0, p.r, 0)
-      setMatrix(mesh, i, p.x, p.y + 0.12 * p.s, p.z, p.r, p.s * (1 + p.v * 0.5), p.s * 0.6, p.s * (1.2 - p.v * 0.3))
-      mesh.setColorAt(i, _c.copy(a).lerp(b, p.v))
-    })
-    group.add(finish(mesh, true, true))
-  }
-
-  // --- soft contact shadows under props (the dark hollows in the reference)
-  {
-    const props: { p: Prop; r: number }[] = [
-      ...data.trees.map((p) => ({ p, r: 2.0 })),
-      ...data.bushes.map((p) => ({ p, r: 1.35 })),
-      ...data.rocks.map((p) => ({ p, r: 1.1 })),
-    ]
-    if (props.length) {
-      const mesh = instanced(assets.blobGeo, assets.blobMat, props.length)
-      props.forEach(({ p, r }, i) => {
-        const k = r * p.s
-        setMatrix(mesh, i, p.x + 0.25, p.y + 0.05, p.z + 0.25, 0, k, 1, k)
-      })
-      mesh.renderOrder = 1
-      group.add(finish(mesh, false, false))
+// ---------------------------------------------------------------------------------------------- water
+function waterMesh(cx: number, cz: number) {
+  const N = CHUNK_SEGMENTS
+  const n1 = N + 1
+  const ox = cx * CHUNK_SIZE + WORLD_HALF
+  const oz = cz * CHUNK_SIZE + WORLD_HALF
+  let any = false
+  for (let j = 0; j <= N && !any; j++) for (let i = 0; i <= N; i++) if (world.depth[(oz + j) * VERTS + ox + i] > 0.01) { any = true; break }
+  if (!any) return null
+  const pos = new Float32Array(n1 * n1 * 3)
+  const dep = new Float32Array(n1 * n1)
+  const flow = new Float32Array(n1 * n1 * 2)
+  for (let j = 0; j <= N; j++) {
+    for (let i = 0; i <= N; i++) {
+      const c = (oz + j) * VERTS + ox + i
+      const k = j * n1 + i
+      const d = world.depth[c]
+      pos[k * 3] = ox + i - WORLD_HALF
+      pos[k * 3 + 1] = (world.wl[c] > NO_WATER / 2 ? Math.max(world.wl[c], world.h[c]) : world.h[c]) + 0.02
+      pos[k * 3 + 2] = oz + j - WORLD_HALF
+      dep[k] = d
+      flow[k * 2] = world.flowX[c]
+      flow[k * 2 + 1] = world.flowZ[c]
     }
   }
+  const idx: number[] = []
+  for (let j = 0; j < N; j++) {
+    for (let i = 0; i < N; i++) {
+      const a = j * n1 + i
+      const b = a + 1
+      const c = a + n1
+      const d = c + 1
+      if (dep[a] > 0.01 || dep[b] > 0.01 || dep[c] > 0.01 || dep[d] > 0.01) idx.push(a, c, b, b, c, d)
+    }
+  }
+  const g = new THREE.BufferGeometry()
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3))
+  g.setAttribute('aDepth', new THREE.BufferAttribute(dep, 1))
+  g.setAttribute('aFlow', new THREE.BufferAttribute(flow, 2))
+  g.setIndex(idx)
+  g.computeBoundingSphere()
+  const m = new THREE.Mesh(g, assets.waterMat)
+  m.renderOrder = 2
+  m.userData.own = true
+  return m
+}
 
-  return group
+function fallObjects(cx: number, cz: number) {
+  const out: THREE.Object3D[] = []
+  const x0 = cx * CHUNK_SIZE
+  const z0 = cz * CHUNK_SIZE
+  for (const f of world.falls) {
+    const n = f.pts.length / 3
+    const mi = Math.floor(n / 2) * 3
+    const mx = f.pts[mi]
+    const mz = f.pts[mi + 2]
+    if (mx < x0 || mx >= x0 + CHUNK_SIZE || mz < z0 || mz >= z0 + CHUNK_SIZE) continue
+    const pos: number[] = []
+    const uv: number[] = []
+    const idx: number[] = []
+    let len = 0
+    for (let i = 0; i < n; i++) {
+      const a = Math.max(0, i - 1) * 3
+      const b = Math.min(n - 1, i + 1) * 3
+      let tx = f.pts[b] - f.pts[a]
+      let tz = f.pts[b + 2] - f.pts[a + 2]
+      const tl = Math.hypot(tx, tz) || 1
+      tx /= tl
+      tz /= tl
+      if (i > 0) len += Math.hypot(f.pts[i * 3] - f.pts[(i - 1) * 3], f.pts[i * 3 + 1] - f.pts[(i - 1) * 3 + 1], f.pts[i * 3 + 2] - f.pts[(i - 1) * 3 + 2])
+      const hw = f.width * 0.5 * 1.1
+      const px = f.pts[i * 3]
+      const py = f.pts[i * 3 + 1]
+      const pz = f.pts[i * 3 + 2]
+      pos.push(px + tz * hw, py, pz - tx * hw, px - tz * hw, py, pz + tx * hw)
+      uv.push(0, len, 1, len)
+      if (i < n - 1) {
+        const k = i * 2
+        idx.push(k, k + 2, k + 1, k + 1, k + 2, k + 3)
+      }
+    }
+    const g = new THREE.BufferGeometry()
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3))
+    g.setAttribute('aUv', new THREE.Float32BufferAttribute(uv, 2))
+    g.setIndex(idx)
+    g.computeBoundingSphere()
+    const sheet = new THREE.Mesh(g, assets.fallMat)
+    sheet.renderOrder = 3
+    sheet.userData.own = true
+    out.push(sheet)
+
+    // mist rising from the plunge pool
+    const bx = f.pts[(n - 1) * 3]
+    const by = f.pts[(n - 1) * 3 + 1]
+    const bz = f.pts[(n - 1) * 3 + 2]
+    const rng = mulberry32(hashInts(Math.round(bx), Math.round(bz), 77))
+    const count = 26
+    const mp: number[] = []
+    const ph: number[] = []
+    const sz: number[] = []
+    for (let i = 0; i < count; i++) {
+      mp.push(bx + (rng() - 0.5) * f.width * 1.2, by - 0.1 + rng() * 0.3, bz + (rng() - 0.3) * 2.2)
+      ph.push(rng())
+      sz.push(0.9 + rng() * 1.1)
+    }
+    const mg = new THREE.BufferGeometry()
+    mg.setAttribute('position', new THREE.Float32BufferAttribute(mp, 3))
+    mg.setAttribute('aPhase', new THREE.Float32BufferAttribute(ph, 1))
+    mg.setAttribute('aSize', new THREE.Float32BufferAttribute(sz, 1))
+    mg.boundingSphere = new THREE.Sphere(new THREE.Vector3(bx, by + 2, bz), f.width + 6)
+    const mist = new THREE.Points(mg, assets.mistMat)
+    mist.renderOrder = 4
+    mist.userData.own = true
+    out.push(mist)
+  }
+  return out
+}
+
+// ---------------------------------------------------------------------------------------------- grass
+function* grassStep(cx: number, cz: number, q: QualitySettings, group: THREE.Group): Generator<void> {
+  const rng = mulberry32(hashInts(cx, cz, WORLD_SEED, 11))
+  const x0 = cx * CHUNK_SIZE
+  const z0 = cz * CHUNK_SIZE
+  const candidates = Math.round(CHUNK_SIZE * CHUNK_SIZE * q.grassDensity)
+  const keep: number[] = []
+  for (let i = 0; i < candidates; i++) {
+    const x = x0 + rng() * CHUNK_SIZE
+    const z = z0 + rng() * CHUNK_SIZE
+    const a = rng()
+    const b = rng()
+    const c = rng()
+    if (i % 1500 === 1499) yield
+    if (depthAt(x, z) > 0) continue
+    const shore = shoreAt(x, z)
+    if (shore > 0.72) continue
+    if (slopeAt(x, z) > 0.9) continue
+    const clear = siteClearance(x, z)
+    const dens = Math.min(1, 0.55 + meadowMask(x, z) * 0.35 + (1 - forestMask(x, z)) * 0.2) * (1 - shore * 0.85) * (clear < 0 ? 0.35 : 1)
+    if (a > dens) continue
+    keep.push(x, z, b, c, rng())
+  }
+  const n = keep.length / 5
+  if (!n) return
+  const mesh = new THREE.InstancedMesh(assets.grassGeo, assets.grassMat, n)
+  mesh.instanceMatrix.setUsage(THREE.StaticDrawUsage)
+  for (let i = 0; i < n; i++) {
+    const x = keep[i * 5]
+    const z = keep[i * 5 + 1]
+    const yaw = (keep[i * 5 + 2] - 0.5) * 1.0 // stay roughly camera-facing so the "| \ /" spikes read
+    const sw = 0.85 + keep[i * 5 + 3] * 0.5
+    const sh = 0.55 + keep[i * 5 + 4] * 0.55
+    _q.setFromAxisAngle(UP, yaw)
+    _loc.compose(_p.set(x, heightAt(x, z) - 0.02, z), _q, _s.set(sw, sh, sw))
+    mesh.setMatrixAt(i, _loc)
+    _c.setHSL(0.235 + (keep[i * 5 + 3] - 0.5) * 0.05, 0.5 + keep[i * 5 + 4] * 0.12, 0.27 + keep[i * 5 + 2] * 0.12, THREE.SRGBColorSpace)
+    mesh.setColorAt(i, _c)
+  }
+  mesh.instanceMatrix.needsUpdate = true
+  if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true
+  mesh.receiveShadow = true
+  mesh.computeBoundingSphere()
+  mesh.userData.own = true
+  group.add(mesh)
+}
+
+// ---------------------------------------------------------------------------------------------- props
+const BUSH_BLOOMS: (keyof typeof PALETTE)[] = ['white', 'pink', 'magenta', 'purple', 'yellow']
+const SOLID_STONE = srgb(0.62, 0.43, 0.22)
+const SOLID_STONE2 = srgb(0.47, 0.36, 0.22)
+const GREY_STONE = srgb(0.56, 0.54, 0.5)
+const GREY_STONE2 = srgb(0.44, 0.44, 0.42)
+const REED_A = srgb(0.55, 0.58, 0.22)
+const REED_B = srgb(0.4, 0.52, 0.2)
+const CATTAIL = srgb(0.34, 0.2, 0.1)
+const PAD = srgb(0.22, 0.5, 0.22)
+const BERRY = srgb(0.85, 0.15, 0.2)
+
+function addBush(b: PropBatch, bu: ReturnType<typeof getChunkData>['bushes'][number]) {
+  setBase(bu.x, bu.y, bu.z, bu.r, bu.s)
+  const rng = mulberry32(hashInts(Math.round(bu.x * 10), Math.round(bu.z * 10), 9))
+  switch (bu.kind) {
+    case 'round':
+      putParts(b, bu.v > 0.6 ? DARK_BUSH : ROUND_BUSH, bu.v)
+      break
+    case 'fern':
+      putParts(b, FERN_PARTS, bu.v)
+      break
+    case 'flowering':
+    case 'berry': {
+      putParts(b, DARK_BUSH, bu.v)
+      const bloom = bu.kind === 'berry' ? BERRY : PALETTE[BUSH_BLOOMS[bu.palette]]
+      const n = bu.kind === 'berry' ? 9 : 14
+      for (let i = 0; i < n; i++) {
+        const a = rng() * Math.PI * 2
+        const el = 0.3 + rng() * 0.95
+        const px = Math.cos(a) * Math.cos(el) * 0.97
+        const py = 0.55 + Math.sin(el) * 0.8 * 0.97
+        const pz = Math.sin(a) * Math.cos(el) * 0.97
+        if (bu.kind === 'berry') put(b, TPL.sphere, px, py, pz, 0.07, 0.07, 0.07, 0, 0, 0, bloom, 0, 0.2)
+        else put(b, TPL.discTilt, px, py + 0.02, pz, 0.15, 0.15, 0.15, 0, a, 0, bloom, 0, 0.3)
+      }
+      break
+    }
+  }
+}
+
+function addFlower(b: PropBatch, f: ReturnType<typeof getChunkData>['flowers'][number]) {
+  setBase(f.x, f.y, f.z, f.r, 1)
+  const s = f.s
+  const col = PALETTE[PALETTE_KEYS[f.c1]]
+  switch (f.kind) {
+    case 'dots':
+      put(b, TPL.discTilt, 0, 0.07 * s, 0, 0.055 * s, 0.055 * s, 0.055 * s, 0, 0, 0, col, 0, 0.3)
+      break
+    case 'clover':
+      put(b, TPL.discTilt, 0, 0.05 * s, 0, 0.045 * s, 0.045 * s, 0.045 * s, 0, 0, 0, col, 0, 0.3)
+      break
+    case 'daisy':
+      put(b, TPL.stem, 0, 0, 0, 0.012 * s, 0.2 * s, 0.012 * s, 0, 0, 0, STEM)
+      put(b, TPL.petals6, 0, 0.2 * s, 0, 0.24 * s, 1, 0.24 * s, 0.8, f.r, 0, col, 0, 0.3)
+      put(b, TPL.discTilt, 0, 0.205 * s, 0, 0.032 * s, 0.032 * s, 0.032 * s, 0, 0, 0, PALETTE.yellow, 0, 0.4)
+      break
+    case 'tulip':
+      put(b, TPL.stem, 0, 0, 0, 0.012 * s, 0.2 * s, 0.012 * s, 0, 0, 0, STEM)
+      put(b, TPL.cup, 0, 0.19 * s, 0, 0.065 * s, 0.14 * s, 0.065 * s, 0, 0, 0, col, 0, 0.25)
+      break
+    case 'poppy':
+      put(b, TPL.stem, 0, 0, 0, 0.012 * s, 0.28 * s, 0.012 * s, 0, 0, 0, STEM)
+      put(b, TPL.petals5, 0, 0.28 * s, 0, 0.32 * s, 1, 0.32 * s, 0.7, f.r, 0, col, 0, 0.3)
+      put(b, TPL.discTilt, 0, 0.285 * s, 0, 0.026 * s, 0.026 * s, 0.026 * s, 0, 0, 0, _c.setRGB(0.05, 0.03, 0.03), 0, 0)
+      break
+    case 'bluebell':
+      put(b, TPL.stem, 0, 0, 0, 0.01 * s, 0.32 * s, 0.01 * s, 0, 0, 0.18, STEM)
+      for (let i = 0; i < 4; i++) put(b, TPL.sphere, 0.055 * s + i * 0.004, (0.3 - i * 0.055) * s, 0, 0.035 * s, 0.04 * s, 0.035 * s, 0, 0, 0, col, 0, 0.25)
+      break
+    case 'lavender':
+      put(b, TPL.stem, 0, 0, 0, 0.01 * s, 0.12 * s, 0.01 * s, 0, 0, 0, STEM)
+      put(b, TPL.cone, 0, 0.1 * s, 0, 0.034 * s, 0.26 * s, 0.034 * s, 0, 0, 0, col, 0, 0.25)
+      put(b, TPL.cone, 0.04 * s, 0.08 * s, 0.02, 0.026 * s, 0.2 * s, 0.026 * s, 0, 0, -0.2, col, 0, 0.25)
+      break
+    case 'sunflower':
+      put(b, TPL.stem, 0, 0, 0, 0.022 * s, 0.85 * s, 0.022 * s, 0, 0, 0, STEM)
+      put(b, TPL.petals9, 0, 0.85 * s, 0, 0.5 * s, 1, 0.5 * s, 1.0, f.r, 0, PALETTE.yellow, 0, 0.35)
+      put(b, TPL.discTilt, 0, 0.86 * s, 0.01, 0.13 * s, 0.13 * s, 0.13 * s, 0.1, 0, 0, _c.setRGB(0.28, 0.17, 0.08), 0, 0)
+      break
+  }
+}
+
+function addRock(b: PropBatch, r: ReturnType<typeof getChunkData>['rocks'][number]) {
+  setBase(r.x, r.y, r.z, r.r, 1)
+  const s = r.s
+  if (r.kind === 'flat') {
+    put(b, TPL.rock, 0, 0.0, 0, s * 0.8, s * 0.2, s * 0.7, 0, 0, 0, _c.copy(GREY_STONE).lerp(GREY_STONE2, r.v), 0, 0, 1)
+  } else if (r.kind === 'boulder') {
+    put(b, TPL.rock, 0, 0.3 * s, 0, s * (1 + r.v * 0.4), s * 0.75, s * (1.1 - r.v * 0.2), r.v * 0.3, 0, r.v * 0.2, _c.copy(GREY_STONE).lerp(GREY_STONE2, r.v), 0, 0, 1)
+  } else {
+    put(b, TPL.rock, 0, 0.1 * s, 0, s * (1 + r.v * 0.5), s * 0.6, s * (1.2 - r.v * 0.3), 0, 0, 0, _c.copy(SOLID_STONE).lerp(SOLID_STONE2, r.v), 0, 0, r.v > 0.5 ? 1 : 0)
+  }
+}
+
+function addReed(b: PropBatch, r: ReturnType<typeof getChunkData>['reeds'][number]) {
+  setBase(r.x, r.y, r.z, r.r, 1)
+  const rng = mulberry32(hashInts(Math.round(r.x * 10), Math.round(r.z * 10), 3))
+  const n = 4 + Math.floor(rng() * 3)
+  for (let i = 0; i < n; i++) {
+    const a = rng() * Math.PI * 2
+    const h = (1.1 + rng() * 0.8) * r.s
+    const lx = Math.cos(a) * 0.14
+    const lz = Math.sin(a) * 0.14
+    const tilt = (rng() - 0.5) * 0.3
+    put(b, TPL.cone, lx, 0, lz, 0.035, h, 0.035, tilt, 0, -tilt, _c.copy(REED_A).lerp(REED_B, rng()), 0, 0)
+    if (rng() < 0.55) put(b, TPL.cyl, lx - tilt * h * 0.9, h * 0.9, lz + tilt * h * 0.9, 0.05, 0.22, 0.05, tilt, 0, -tilt, CATTAIL, 0, 0)
+  }
+}
+
+function addLily(b: PropBatch, l: ReturnType<typeof getChunkData>['lilies'][number]) {
+  setBase(l.x, l.y + 0.05, l.z, l.r, l.s)
+  put(b, TPL.discUp, 0, 0, 0, 0.5, 1, 0.5, 0, 0, 0, PAD, 0, 0.08)
+  if (l.lotus) {
+    put(b, TPL.petals5, 0, 0.05, 0, 0.6, 1, 0.6, 0.15, l.r, 0, PALETTE[PALETTE_KEYS[l.palette]], 0, 0.3)
+    put(b, TPL.discUp, 0, 0.09, 0, 0.07, 1, 0.07, 0, 0, 0, PALETTE.yellow, 0, 0.4)
+  }
+}
+
+const TPL_BY_KIND: Record<string, Template> = { box: TPL.box, cyl: TPL.cyl, cone: TPL.cone, sphere: TPL.sphere }
+
+function* propsStep(cx: number, cz: number, q: QualitySettings, group: THREE.Group): Generator<void> {
+  const data = getChunkData(cx, cz)
+  const b = new PropBatch()
+
+  for (const t of data.trees) {
+    setBase(t.x, t.y, t.z, t.r, t.s)
+    putParts(b, TREE_PARTS[t.kind][t.variant], t.v)
+  }
+  yield
+  for (const bu of data.bushes) addBush(b, bu)
+  yield
+  const keepEvery = Math.max(1, Math.round(1 / q.flowerDensity))
+  data.flowers.forEach((f, i) => {
+    if (i % keepEvery === 0) addFlower(b, f)
+  })
+  yield
+  for (const r of data.rocks) addRock(b, r)
+  for (const r of data.reeds) addReed(b, r)
+  for (const l of data.lilies) addLily(b, l)
+  yield
+  for (const p of data.parts) {
+    _e.set(p.rx, p.ry, p.rz)
+    _q.setFromEuler(_e)
+    _loc.compose(_p.set(p.x, p.y, p.z), _q, _s.set(p.sx, p.sy, p.sz))
+    b.add(TPL_BY_KIND[p.kind], _loc, _c.setRGB(p.color[0], p.color[1], p.color[2], THREE.SRGBColorSpace), 0, p.emis, p.moss)
+  }
+  const g = b.build()
+  if (g) {
+    const mesh = new THREE.Mesh(g, assets.propMat)
+    mesh.castShadow = true
+    mesh.receiveShadow = true
+    mesh.userData.own = true
+    group.add(mesh)
+  }
+}
+
+/** Builds one chunk in several steps (generator): the caller advances it a little every frame. */
+export function* buildChunkSteps(group: THREE.Group, cx: number, cz: number, q: QualitySettings): Generator<void> {
+  group.name = `chunk ${cx},${cz}`
+  getChunkData(cx, cz)
+  yield
+  const ao = bakeAO(cx, cz)
+  group.add(terrainMesh(cx, cz, ao))
+  yield
+  const water = waterMesh(cx, cz)
+  if (water) group.add(water)
+  for (const o of fallObjects(cx, cz)) group.add(o)
+  yield
+  yield* grassStep(cx, cz, q, group)
+  yield
+  yield* propsStep(cx, cz, q, group)
 }
 
 export function disposeChunk(group: THREE.Group) {
   group.traverse((o) => {
     if (o instanceof THREE.InstancedMesh) o.dispose()
-    else if (o instanceof THREE.Mesh && o.userData.ownsGeometry) o.geometry.dispose()
+    if (o.userData.own && (o as THREE.Mesh).geometry) (o as THREE.Mesh).geometry.dispose()
   })
 }

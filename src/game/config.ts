@@ -1,8 +1,8 @@
 import * as THREE from 'three'
 
 export const WORLD_SEED = 20261030
-export const CHUNK_SIZE = 40
-export const CHUNK_SEGMENTS = 40
+export const CHUNK_SIZE = 32
+export const CHUNK_SEGMENTS = 32
 
 /** Reference video: high-angle follow camera, ~55 degree pitch, narrow FOV. */
 export const CAMERA = {
@@ -37,6 +37,7 @@ export interface QualitySettings {
   shadowMapSize: number
   chunkRadius: number
   grassDensity: number
+  flowerDensity: number
   bloom: boolean
   smaa: boolean
   godRays: boolean
@@ -44,7 +45,7 @@ export interface QualitySettings {
 }
 
 export const QUALITY: Record<Quality, QualitySettings> = {
-  low: { dpr: 1, shadowMapSize: 1024, chunkRadius: 1, grassDensity: 3.0, bloom: false, smaa: false, godRays: false, pollen: 50 },
-  medium: { dpr: 1.5, shadowMapSize: 2048, chunkRadius: 2, grassDensity: 5.0, bloom: true, smaa: false, godRays: true, pollen: 110 },
-  high: { dpr: 2, shadowMapSize: 3072, chunkRadius: 2, grassDensity: 7.0, bloom: true, smaa: true, godRays: true, pollen: 200 },
+  low: { dpr: 1, shadowMapSize: 1024, chunkRadius: 1, grassDensity: 4.0, flowerDensity: 0.6, bloom: false, smaa: false, godRays: false, pollen: 40 },
+  medium: { dpr: 1.5, shadowMapSize: 2048, chunkRadius: 1, grassDensity: 6.5, flowerDensity: 1, bloom: true, smaa: false, godRays: true, pollen: 90 },
+  high: { dpr: 2, shadowMapSize: 2048, chunkRadius: 2, grassDensity: 8.0, flowerDensity: 1, bloom: true, smaa: true, godRays: true, pollen: 160 },
 }

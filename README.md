@@ -44,3 +44,8 @@ public/models   Drop GLB characters / props here
 - Worlds are deterministic from `WORLD_SEED` in `src/game/config.ts`.
 - `three` is pinned to 0.186 because `postprocessing` does not support 0.187 yet.
 - See `docs/ROADMAP.md` for the phase plan and `docs/ATTRIBUTION.md` for asset credits.
+
+## World (v1.1)
+- Finite 512x512 world generated at startup from a hydrology simulation: rivers follow drainage, lakes sit in real basins, waterfalls form where rivers drop over the escarpment.
+- Ruins, cottages, stone circles, shrines and archways are placed on flattened dry ground; many are broken.
+- Chunks stream in staged steps with a per-frame time budget; props merge into one mesh per chunk; adaptive resolution targets 60 fps.
