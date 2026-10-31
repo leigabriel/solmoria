@@ -24,24 +24,28 @@ export interface CharacterRig {
   guard: THREE.Object3D
 }
 
-const CAPE_W = 0.4
-const CAPE_H = 0.78
+const CAPE_W = 0.2
+const CAPE_H = 0.2
 const CAPE_SEG_X = 3
-const CAPE_SEG_Y = 6
+const CAPE_SEG_Y = 4
+export const HIP_Y = 0.28
 
 /**
- * Procedural hooded wanderer. Faces +Z, ~1.25 units tall (reads as the small hero of the reference).
- * Everything is built from primitives so no external asset is required; a GLB can replace this later.
+ * The samurai blob: a plump white body, straw kasa hat with grey ears, dark eye patch and whiskers,
+ * olive sash, katana in hand and a scabbard on the back (see the character sheet). Faces +Z, ~1.05 tall.
+ * Built from primitives so no asset is required; a GLB can replace it later.
  */
 export function createCharacter(): CharacterRig {
-  const cloakMat = new THREE.MeshLambertMaterial({ color: srgb(0.36, 0.13, 0.11) })
-  const cloakDark = new THREE.MeshLambertMaterial({ color: srgb(0.24, 0.09, 0.08) })
-  const capeMat = new THREE.MeshLambertMaterial({ color: srgb(0.30, 0.10, 0.09), side: THREE.DoubleSide })
-  const tunicMat = new THREE.MeshLambertMaterial({ color: srgb(0.15, 0.11, 0.11) })
-  const leatherMat = new THREE.MeshLambertMaterial({ color: srgb(0.30, 0.20, 0.12) })
-  const faceMat = new THREE.MeshLambertMaterial({ color: srgb(0.05, 0.04, 0.05) })
-  const glow = new THREE.MeshBasicMaterial({ color: new THREE.Color(1.5, 1.45, 0.45) })
-  const eyeGlow = new THREE.MeshBasicMaterial({ color: new THREE.Color(2.2, 2.0, 0.6) })
+  const white = new THREE.MeshLambertMaterial({ color: srgb(0.97, 0.955, 0.92) })
+  const ink = new THREE.MeshBasicMaterial({ color: srgb(0.1, 0.07, 0.07), side: THREE.BackSide })
+  const dark = new THREE.MeshLambertMaterial({ color: srgb(0.14, 0.11, 0.12) })
+  const patch = new THREE.MeshLambertMaterial({ color: srgb(0.36, 0.35, 0.37) })
+  const hat = new THREE.MeshLambertMaterial({ color: srgb(0.93, 0.62, 0.16), side: THREE.DoubleSide })
+  const hatDark = new THREE.MeshLambertMaterial({ color: srgb(0.78, 0.46, 0.1) })
+  const grey = new THREE.MeshLambertMaterial({ color: srgb(0.46, 0.45, 0.47) })
+  const olive = new THREE.MeshLambertMaterial({ color: srgb(0.5, 0.5, 0.26), side: THREE.DoubleSide })
+  const gold = new THREE.MeshLambertMaterial({ color: srgb(0.78, 0.6, 0.2) })
+  const capeMat = olive
 
   const root = new THREE.Group()
   const body = new THREE.Group()
@@ -53,29 +57,31 @@ export function createCharacter(): CharacterRig {
     o.castShadow = cast
     return o
   }
-  const ring = (r: number, t: number, y: number, parent: THREE.Object3D) => {
-    const m = mesh(new THREE.TorusGeometry(r, t, 6, 20), glow, 0, y, 0, false)
-    m.rotation.x = Math.PI / 2
-    parent.add(m)
-    return m
+  /** cartoon outline: inverted hull a touch larger than the shape */
+  const outlined = (g: THREE.BufferGeometry, m: THREE.Material, x: number, y: number, z: number, sx: number, sy: number, sz: number, w = 0.012) => {
+    const grp = new THREE.Group()
+    grp.position.set(x, y, z)
+    const a = mesh(g, m)
+    a.scale.set(sx, sy, sz)
+    const o = new THREE.Mesh(g, ink)
+    o.scale.set(sx + w, sy + w, sz + w)
+    grp.add(a, o)
+    return grp
   }
 
-  // ---- hips (pelvis pivot) ------------------------------------------------------------------
+  // ---- hips (pelvis pivot) + stubby legs ------------------------------------------------------
   const hips = new THREE.Group()
-  hips.position.y = 0.5
+  hips.position.y = HIP_Y
   body.add(hips)
-  hips.add(mesh(new THREE.CylinderGeometry(0.15, 0.14, 0.12, 10), tunicMat, 0, 0, 0))
 
   const leg = (side: number) => {
     const thigh = new THREE.Group()
-    thigh.position.set(0.085 * side, -0.02, 0)
-    thigh.add(mesh(new THREE.CylinderGeometry(0.068, 0.056, 0.25, 7), tunicMat, 0, -0.125, 0))
+    thigh.position.set(0.1 * side, -0.02, 0)
+    thigh.add(outlined(new THREE.CylinderGeometry(1, 0.85, 1, 8), white, 0, -0.06, 0, 0.075, 0.13, 0.075, 0.01))
     const shin = new THREE.Group()
-    shin.position.y = -0.25
-    shin.add(mesh(new THREE.CylinderGeometry(0.055, 0.045, 0.22, 7), tunicMat, 0, -0.11, 0))
-    // wrapped boot: cuff + foot
-    shin.add(mesh(new THREE.CylinderGeometry(0.062, 0.058, 0.09, 7), leatherMat, 0, -0.19, 0))
-    shin.add(mesh(new THREE.BoxGeometry(0.1, 0.07, 0.19), leatherMat, 0, -0.235, 0.035))
+    shin.position.y = -0.12
+    shin.add(outlined(new THREE.CylinderGeometry(0.8, 0.7, 1, 8), white, 0, -0.05, 0, 0.065, 0.1, 0.065, 0.01))
+    shin.add(outlined(new THREE.SphereGeometry(1, 8, 6), white, 0, -0.14, 0.03, 0.075, 0.045, 0.1, 0.01))
     thigh.add(shin)
     hips.add(thigh)
     return { thigh, shin }
@@ -83,64 +89,78 @@ export function createCharacter(): CharacterRig {
   const L = leg(-1)
   const R = leg(1)
 
-  // ---- torso ---------------------------------------------------------------------------------
+  // ---- torso: the big plump body -------------------------------------------------------------
   const torso = new THREE.Group()
-  torso.position.y = 0.04
+  torso.position.y = 0.0
   hips.add(torso)
-  torso.add(mesh(new THREE.CylinderGeometry(0.15, 0.17, 0.4, 10), cloakMat, 0, 0.2, 0))
-  ring(0.172, 0.014, 0.02, torso) // glowing belt
-  // belt buckle + satchel
-  torso.add(mesh(new THREE.BoxGeometry(0.05, 0.05, 0.02), glow, 0, 0.02, 0.17, false))
-  torso.add(mesh(new THREE.BoxGeometry(0.1, 0.12, 0.07), leatherMat, 0.17, -0.01, -0.02))
-  // sheathed blade across the lower back, glowing hilt
+  torso.add(outlined(new THREE.SphereGeometry(1, 20, 16), white, 0, 0.3, 0, 0.27, 0.36, 0.25, 0.018))
+
+  // olive sash / loincloth sagging at the front
+  const sash = mesh(new THREE.CylinderGeometry(0.262, 0.25, 0.1, 18, 1, true, -1.35, 2.7), olive, 0, 0.11, 0)
+  torso.add(sash)
+  const sashBelt = mesh(new THREE.TorusGeometry(0.255, 0.012, 5, 22, Math.PI * 1.5), dark, 0, 0.165, 0, false)
+  sashBelt.rotation.set(Math.PI / 2, 0, Math.PI * 0.75 + Math.PI)
+  torso.add(sashBelt)
+  const sag = mesh(new THREE.SphereGeometry(1, 10, 6, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2), olive, 0, 0.07, 0.15)
+  sag.scale.set(0.2, 0.09, 0.12)
+  torso.add(sag)
+
+  // scabbard on the back with the hilt peeking over the shoulder
   const sheath = new THREE.Group()
-  sheath.position.set(-0.13, 0.05, -0.15)
-  sheath.rotation.set(1.05, 0, 0.35)
-  sheath.add(mesh(new THREE.CylinderGeometry(0.02, 0.016, 0.5, 6), leatherMat, 0, -0.04, 0))
-  sheath.add(mesh(new THREE.CylinderGeometry(0.014, 0.014, 0.12, 6), glow, 0, 0.26, 0, false))
-  sheath.add(mesh(new THREE.BoxGeometry(0.1, 0.018, 0.026), leatherMat, 0, 0.2, 0))
+  sheath.position.set(-0.13, 0.3, -0.24)
+  sheath.rotation.set(0.15, 0, 0.55)
+  sheath.add(mesh(new THREE.CylinderGeometry(0.026, 0.022, 0.62, 7), dark, 0, 0, 0))
+  sheath.add(mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.03, 7), gold, 0, 0.3, 0))
+  sheath.add(mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.13, 7), grey, 0, 0.38, 0))
+  const sBand = mesh(new THREE.TorusGeometry(0.03, 0.007, 5, 10), gold, 0, -0.12, 0, false)
+  sBand.rotation.x = Math.PI / 2
+  sheath.add(sBand)
   torso.add(sheath)
 
-  // shoulder mantle + glowing collar
-  const mantle = mesh(new THREE.SphereGeometry(0.235, 12, 8, 0, Math.PI * 2, 0, Math.PI * 0.55), cloakDark, 0, 0.36, 0)
-  mantle.scale.set(1, 0.62, 0.92)
-  torso.add(mantle)
-  ring(0.15, 0.012, 0.41, torso)
-
-  // ---- head + hood -----------------------------------------------------------------------------
+  // ---- head: hat, ears, face --------------------------------------------------------------------
   const head = new THREE.Group()
   head.position.set(0, 0.5, 0)
   torso.add(head)
-  head.add(mesh(new THREE.SphereGeometry(0.125, 12, 10), faceMat, 0, 0.03, 0.01))
-  // glowing eyes inside the hood opening
+  // grey ears poking out through the hat
   for (const sx of [-1, 1]) {
-    head.add(mesh(new THREE.SphereGeometry(0.014, 6, 5), eyeGlow, 0.048 * sx, 0.04, 0.115, false))
+    const ear = mesh(new THREE.ConeGeometry(0.05, 0.11, 6), grey, 0.125 * sx, 0.23, -0.02)
+    ear.rotation.z = -0.35 * sx
+    head.add(ear)
   }
-  const hoodShell = mesh(new THREE.SphereGeometry(0.175, 14, 10, 0, Math.PI * 2, 0, Math.PI * 0.66), cloakMat, 0, 0.04, -0.02)
-  hoodShell.scale.set(1, 1.05, 1.08)
-  head.add(hoodShell)
-  const hoodBack = mesh(new THREE.SphereGeometry(0.15, 10, 8), cloakDark, 0, -0.03, -0.09)
-  hoodBack.scale.set(1, 1.1, 0.9)
-  head.add(hoodBack)
-  const peak = mesh(new THREE.ConeGeometry(0.095, 0.26, 8), cloakMat, 0, 0.16, -0.13)
-  peak.rotation.x = -1.0
-  head.add(peak)
-  // hood rim glow trim
-  const rim = mesh(new THREE.TorusGeometry(0.128, 0.008, 5, 20, Math.PI * 1.35), glow, 0, 0.045, 0.085, false)
-  rim.rotation.set(0, 0, Math.PI * 0.825)
-  rim.scale.set(1, 1, 0.8)
-  head.add(rim)
+  // kasa: wide shallow cone with a darker rim and a little top knob
+  const kasa = outlined(new THREE.ConeGeometry(1, 0.42, 18, 1, true), hat, 0, 0.17, 0, 0.36, 0.34, 0.36, 0.014)
+  head.add(kasa)
+  const rimDisc = mesh(new THREE.TorusGeometry(0.355, 0.012, 5, 28), hatDark, 0, 0.115, 0, false)
+  rimDisc.rotation.x = Math.PI / 2
+  head.add(rimDisc)
+  head.add(mesh(new THREE.SphereGeometry(0.03, 6, 5), hatDark, 0, 0.3, 0, false))
+  // face
+  for (const sx of [-1, 1]) {
+    const eye = mesh(new THREE.SphereGeometry(1, 6, 5), dark, 0.07 * sx, 0.02, 0.2, false)
+    eye.scale.set(0.014, 0.02, 0.008)
+    head.add(eye)
+    for (let i = 0; i < 3; i++) {
+      const w = mesh(new THREE.BoxGeometry(0.075, 0.004, 0.004), dark, 0.16 * sx, 0.0 - i * 0.018, 0.17, false)
+      w.rotation.set(0, -0.6 * sx, (i - 1) * 0.16 * sx)
+      head.add(w)
+    }
+  }
+  const eyePatch = mesh(new THREE.SphereGeometry(1, 10, 8), patch, 0.09, 0.025, 0.178, false)
+  eyePatch.scale.set(0.06, 0.055, 0.03)
+  head.add(eyePatch)
+  const nose = mesh(new THREE.SphereGeometry(1, 5, 4), dark, 0, 0.0, 0.208, false)
+  nose.scale.set(0.012, 0.008, 0.006)
+  head.add(nose)
 
-  // ---- arms ------------------------------------------------------------------------------------
+  // ---- arms (short nubs) -------------------------------------------------------------------------
   const arm = (side: number) => {
     const upper = new THREE.Group()
-    upper.position.set(0.215 * side, 0.36, 0)
-    upper.add(mesh(new THREE.CylinderGeometry(0.05, 0.042, 0.25, 7), cloakMat, 0, -0.125, 0))
+    upper.position.set(0.245 * side, 0.4, 0)
+    upper.add(outlined(new THREE.CylinderGeometry(0.9, 0.75, 1, 8), white, 0, -0.06, 0, 0.055, 0.13, 0.055, 0.01))
     const fore = new THREE.Group()
-    fore.position.y = -0.25
-    fore.add(mesh(new THREE.CylinderGeometry(0.042, 0.036, 0.22, 7), cloakMat, 0, -0.11, 0))
-    ring(0.046, 0.009, -0.17, fore) // glowing bracer
-    fore.add(mesh(new THREE.SphereGeometry(0.04, 8, 6), tunicMat, 0, -0.245, 0))
+    fore.position.y = -0.12
+    fore.add(outlined(new THREE.CylinderGeometry(0.75, 0.65, 1, 8), white, 0, -0.05, 0, 0.05, 0.1, 0.05, 0.01))
+    fore.add(outlined(new THREE.SphereGeometry(1, 8, 6), white, 0, -0.12, 0, 0.055, 0.055, 0.055, 0.01))
     upper.add(fore)
     torso.add(upper)
     return { upper, fore }
@@ -148,12 +168,20 @@ export function createCharacter(): CharacterRig {
   const aL = arm(-1)
   const aR = arm(1)
 
+  // ---- small sash tail (vertex-animated every frame) ----------------------------------------------
+  const capeGeo = new THREE.PlaneGeometry(CAPE_W, CAPE_H, CAPE_SEG_X, CAPE_SEG_Y)
+  capeGeo.translate(0, -CAPE_H / 2, 0)
+  const capeBase = new Float32Array(capeGeo.attributes.position.array as Float32Array)
+  const cape = mesh(capeGeo, capeMat, 0, 0.17, -0.25)
+  cape.frustumCulled = false
+  torso.add(cape)
+
   // ---- katana (blade +Y in its own space; rotated so it points forward from the fist) -------------
   const katana = new THREE.Group()
   const steel = new THREE.MeshLambertMaterial({ color: srgb(0.82, 0.86, 0.9), emissive: srgb(0.35, 0.33, 0.2), emissiveIntensity: 0.55 })
   const edge = new THREE.MeshBasicMaterial({ color: srgb(1, 0.96, 0.78) })
   const wrap = new THREE.MeshLambertMaterial({ color: srgb(0.12, 0.08, 0.1) })
-  const gold = new THREE.MeshLambertMaterial({ color: srgb(0.78, 0.6, 0.2), emissive: srgb(0.4, 0.28, 0.05), emissiveIntensity: 0.5 })
+  const kGold = new THREE.MeshLambertMaterial({ color: srgb(0.78, 0.6, 0.2), emissive: srgb(0.4, 0.28, 0.05), emissiveIntensity: 0.5 })
   const bladeGeo = new THREE.BoxGeometry(0.02, 0.56, 0.05)
   bladeGeo.translate(0, 0.28 + 0.06, 0)
   const blade = new THREE.Mesh(bladeGeo, steel)
@@ -161,11 +189,11 @@ export function createCharacter(): CharacterRig {
   const tipMesh = new THREE.Mesh(tipGeo, steel)
   tipMesh.position.y = 0.34 + 0.28 + 0.03
   const edgeLine = new THREE.Mesh(new THREE.BoxGeometry(0.004, 0.56, 0.006).translate(0, 0.34, 0.016), edge)
-  const tsuba = new THREE.Mesh(new THREE.CylinderGeometry(0.036, 0.036, 0.009, 10), gold)
+  const tsuba = new THREE.Mesh(new THREE.CylinderGeometry(0.036, 0.036, 0.009, 10), kGold)
   tsuba.position.y = 0.06
   const grip = new THREE.Mesh(new THREE.CylinderGeometry(0.017, 0.017, 0.15, 7), wrap)
   grip.position.y = -0.02
-  const pommel = new THREE.Mesh(new THREE.SphereGeometry(0.02, 6, 5), gold)
+  const pommel = new THREE.Mesh(new THREE.SphereGeometry(0.02, 6, 5), kGold)
   pommel.position.y = -0.1
   katana.add(blade, tipMesh, edgeLine, tsuba, grip, pommel)
   katana.traverse((o) => { o.castShadow = true })
@@ -175,23 +203,9 @@ export function createCharacter(): CharacterRig {
   guard.position.y = 0.1
   katana.add(tip, guard)
   katana.scale.setScalar(1.15)
-  katana.position.set(0, -0.245, 0.01)
+  katana.position.set(0, -0.12, 0.01)
   katana.rotation.x = Math.PI / 2 + 0.25
   aR.fore.add(katana)
-
-  // empty scabbard on the left hip
-  const saya = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.5, 0.04), wrap)
-  saya.position.set(-0.17, 0.0, -0.06)
-  saya.rotation.set(0.0, 0, 1.2)
-  hips.add(saya)
-
-  // ---- flowing cape (vertex-animated every frame) -----------------------------------------------
-  const capeGeo = new THREE.PlaneGeometry(CAPE_W, CAPE_H, CAPE_SEG_X, CAPE_SEG_Y)
-  capeGeo.translate(0, -CAPE_H / 2, 0)
-  const capeBase = new Float32Array(capeGeo.attributes.position.array as Float32Array)
-  const cape = mesh(capeGeo, capeMat, 0, 0.37, -0.155)
-  cape.frustumCulled = false
-  torso.add(cape)
 
   return {
     root,
@@ -300,7 +314,7 @@ export function animateCharacter(rig: CharacterRig, speed: number, dt: number, t
   rig.torso.rotation.y = s * 0.14 * move
   rig.hips.rotation.y = -s * 0.1 * move
   rig.torso.rotation.x = THREE.MathUtils.lerp(rig.torso.rotation.x, 0.03 + run * 0.2, k)
-  rig.hips.position.y = 0.5 + Math.abs(Math.cos(p)) * 0.05 * move - run * 0.025 + Math.sin(time * 1.9) * 0.006 * idle
+  rig.hips.position.y = HIP_Y + Math.abs(Math.cos(p)) * 0.035 * move - run * 0.025 + Math.sin(time * 1.9) * 0.006 * idle
   rig.torso.scale.y = 1 + Math.sin(time * 1.9) * 0.012 * idle
 
   // head keeps level, glances around when idle

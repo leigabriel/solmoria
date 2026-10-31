@@ -7,3 +7,7 @@ Add every imported model, texture or sound here with its source and license.
 All sound effects (ambience, water, waterfalls, footsteps, animal calls, sword swings and hits) are synthesised at runtime with the Web Audio API in `src/audio/audio.ts`. No audio files are bundled, so there is nothing to license.
 
 Researched sources for a future recorded-sound upgrade (check each licence before use): OpenGameArt (CC0 filter), Kenney audio packs (CC0), Freesound (CC0 filter), Mixkit (free licence).
+
+## Font and character
+- UI font: Helvetica Neue Light (`src/assets/fonts/HelveticaNeueLight.otf`), supplied by the project owner. It is a commercial typeface: confirm the licence covers web embedding before shipping publicly.
+- Character design reference: `docs/character-sheet.jpg` (supplied by the project owner); portrait `src/assets/pfp.png` is cropped from it.

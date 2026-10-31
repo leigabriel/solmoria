@@ -20,7 +20,7 @@ export function NameTagDriver() {
   useFrame(({ camera, size }) => {
     if (!el) return
     camera.updateMatrixWorld()
-    v.set(playerState.pos.x, playerState.pos.y + 1.4, playerState.pos.z).project(camera)
+    v.set(playerState.pos.x, playerState.pos.y + 1.6, playerState.pos.z).project(camera)
     const visible = v.z < 1
     el.style.visibility = visible ? 'visible' : 'hidden'
     const x = (v.x * 0.5 + 0.5) * size.width

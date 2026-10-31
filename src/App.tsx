@@ -2,6 +2,7 @@ import { Game } from './game/Game'
 import { Joystick } from './input/Joystick'
 import { useKeyboard } from './input/useKeyboard'
 import { NameTag } from './ui/NameTag'
+import { Hud } from './ui/Hud'
 import { AttackButtons } from './ui/AttackButtons'
 import { useEffect } from 'react'
 import { playerState } from './game/store'
@@ -23,6 +24,7 @@ export default function App() {
       <Joystick />
       <AttackButtons />
       <NameTag />
+      <Hud />
       <div className="mist" />
     </>
   )

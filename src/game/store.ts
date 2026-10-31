@@ -48,3 +48,43 @@ export const input = {
   joyY: 0,
   used: false,
 }
+
+interface Hud {
+  hp: number
+  maxHp: number
+  menuOpen: boolean
+  bagOpen: boolean
+  volume: number
+  setMenu: (v: boolean) => void
+  setBag: (v: boolean) => void
+  setVolume: (v: number) => void
+}
+
+const VOL_KEY = 'solmoria.volume'
+function initialVolume() {
+  try {
+    const v = parseFloat(localStorage.getItem(VOL_KEY) ?? '')
+    if (v >= 0 && v <= 1) return v
+  } catch {
+    /* storage may be unavailable */
+  }
+  return 0.7
+}
+
+export const useHud = create<Hud>((set) => ({
+  hp: 100,
+  maxHp: 100,
+  menuOpen: false,
+  bagOpen: false,
+  volume: initialVolume(),
+  setMenu: (menuOpen) => set({ menuOpen, bagOpen: false }),
+  setBag: (bagOpen) => set({ bagOpen, menuOpen: false }),
+  setVolume: (volume) => {
+    try {
+      localStorage.setItem(VOL_KEY, String(volume))
+    } catch {
+      /* ignore */
+    }
+    set({ volume })
+  },
+}))

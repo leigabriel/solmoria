@@ -96,6 +96,7 @@ export function Player() {
       playerState.facing = lerpAngle(playerState.facing, Math.atan2(vel.x, vel.z), 1 - Math.exp(-PLAYER.turnRate * dt))
     }
 
+    rig.root.scale.setScalar(1.3)
     rig.root.position.copy(pos)
     rig.root.rotation.y = playerState.facing
     const prevPhase = Math.floor(rig.phase / Math.PI)

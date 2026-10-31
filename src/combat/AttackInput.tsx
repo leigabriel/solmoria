@@ -2,7 +2,7 @@ import { useEffect } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { audio } from '../audio/audio'
-import { playerState } from '../game/store'
+import { playerState, useHud } from '../game/store'
 import { combat, requestAttack, type AttackKind } from './state'
 
 /**
@@ -24,7 +24,7 @@ export function AttackInput() {
     const el = gl.domElement
     const pd = (e: PointerEvent) => {
       audio.start()
-      if ((e.target as HTMLElement)?.closest?.('.atk')) return
+      if ((e.target as HTMLElement)?.closest?.('.atk, .hud-ui')) return
       if (e.pointerType !== 'mouse') return
       pointer.active = true
       if (e.button === 0) requestAttack('light')
@@ -41,6 +41,8 @@ export function AttackInput() {
     const kd = (e: KeyboardEvent) => {
       audio.start()
       const k = KEYS[e.code]
+      const h = useHud.getState()
+      if (h.menuOpen || h.bagOpen) return
       if (!k || e.repeat) return
       e.preventDefault()
       requestAttack(k)

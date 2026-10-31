@@ -15,6 +15,7 @@ let waterFilter: BiquadFilterNode
 let birdTimer = 0
 let waterTimer = 0
 let started = false
+let pendingVolume = 0.7
 
 const clamp = (v: number, a: number, b: number) => Math.min(b, Math.max(a, v))
 const rnd = (a: number, b: number) => a + Math.random() * (b - a)
@@ -124,6 +125,11 @@ function buildAmbience() {
 }
 
 export const audio = {
+  setVolume(v: number) {
+    pendingVolume = v
+    if (ctx) master.gain.setTargetAtTime(v, ctx.currentTime, 0.05)
+  },
+
   /** Call from a user gesture. */
   start() {
     if (started) {
@@ -135,7 +141,7 @@ export const audio = {
     if (!AC) return
     ctx = new AC()
     master = ctx.createGain()
-    master.gain.value = 0.7
+    master.gain.value = pendingVolume
     const comp = ctx.createDynamicsCompressor()
     master.connect(comp).connect(ctx.destination)
     noiseBuf = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate)
