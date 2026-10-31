@@ -61,3 +61,6 @@ public/models   Drop GLB characters / props here
 | Touch | left thumb moves, right-side buttons attack |
 
 The blade swings toward the mouse pointer. Animals scatter when struck near or run at.
+
+## Villages and villagers
+Eight villages are placed on flat dry ground across the map (plaza, well, market stalls, windmill, mushroom houses, thatched cottages, tower houses, hobbit holes). Farmers, elders, merchants, children and guards wander inside them; walk up to one to see a line of dialogue. Press `M` for the world map, `Space` to jump.

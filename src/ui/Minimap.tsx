@@ -1,6 +1,8 @@
 import { useEffect, useRef } from 'react'
 import { playerState } from '../game/store'
+import { useHud } from '../game/store'
 import { SEA_LEVEL, VERTS, WORLD_HALF, world } from '../world/terrainData'
+import { villages } from '../world/villages'
 
 const SIZE = 150
 const VIEW = 96 // world units shown across the square
@@ -8,7 +10,7 @@ const VIEW = 96 // world units shown across the square
 let cache: HTMLCanvasElement | null = null
 
 /** One pixel per world unit, rendered once from the real terrain / water / site data. */
-function worldImage() {
+export function worldImage() {
   if (cache) return cache
   const c = document.createElement('canvas')
   c.width = c.height = VERTS - 1
@@ -47,8 +49,19 @@ function worldImage() {
   g.putImageData(img, 0, 0)
   // landmarks
   for (const s of world.sites) {
+    if (s.type === 'village') continue
     g.fillStyle = '#4a3b2a'
     g.fillRect(s.x + WORLD_HALF - 1.5, s.z + WORLD_HALF - 1.5, 3, 3)
+  }
+  for (const v of villages) {
+    g.fillStyle = '#ffffff'
+    g.beginPath()
+    g.arc(v.site.x + WORLD_HALF, v.site.z + WORLD_HALF, 4.2, 0, Math.PI * 2)
+    g.fill()
+    g.fillStyle = '#c0562f'
+    g.beginPath()
+    g.arc(v.site.x + WORLD_HALF, v.site.z + WORLD_HALF, 2.8, 0, Math.PI * 2)
+    g.fill()
   }
   g.fillStyle = '#ffffff'
   for (const f of world.falls) {
@@ -106,9 +119,9 @@ export function Minimap() {
   }, [])
 
   return (
-    <div className="hud-map">
+    <button className="hud-map hud-ui" onClick={() => useHud.getState().setMap(true)} aria-label="Open map" title="Map (M)">
       <canvas ref={ref} />
       <span className="hud-n">N</span>
-    </div>
+    </button>
   )
 }

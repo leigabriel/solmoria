@@ -3,6 +3,7 @@ import { audio } from '../audio/audio'
 import { PLAYER_NAME, QUALITY, type Quality } from '../game/config'
 import { useHud, useSettings } from '../game/store'
 import pfp from '../assets/pfp.png'
+import { MapModal } from './MapModal'
 import { Minimap } from './Minimap'
 
 function BagIcon() {
@@ -29,8 +30,11 @@ const CONTROLS: [string, string][] = [
   ['Shift', 'walk'],
   ['Left click / J', 'slash (chain 3 hits)'],
   ['Right click / K', 'heavy slam'],
-  ['Space / E', 'dash thrust'],
+  ['E', 'dash thrust'],
   ['Q / R', 'spin slash'],
+  ['Space', 'jump'],
+  ['M', 'map'],
+  ['B', 'bag'],
 ]
 
 function MenuPanel() {
@@ -111,8 +115,14 @@ export function Hud() {
 
   useEffect(() => {
     const k = (e: KeyboardEvent) => {
-      if (e.code === 'Escape') setMenu(!useHud.getState().menuOpen)
+      if (e.code === 'Escape') {
+        const h = useHud.getState()
+        if (h.mapOpen) h.setMap(false)
+        else if (h.bagOpen) h.setBag(false)
+        else h.setMenu(!h.menuOpen)
+      }
       else if (e.code === 'KeyB' || e.code === 'KeyI') setBag(!useHud.getState().bagOpen)
+      else if (e.code === 'KeyM') useHud.getState().setMap(!useHud.getState().mapOpen)
     }
     window.addEventListener('keydown', k)
     return () => window.removeEventListener('keydown', k)
@@ -143,6 +153,7 @@ export function Hud() {
 
       <MenuPanel />
       <BagPanel />
+      <MapModal />
     </div>
   )
 }

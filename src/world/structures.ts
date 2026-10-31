@@ -3,7 +3,7 @@ import { heightAt } from './terrainData'
 import type { Site } from './hydrology'
 
 export interface SPart {
-  kind: 'box' | 'cyl' | 'cone' | 'sphere'
+  kind: 'box' | 'cyl' | 'cone' | 'sphere' | 'dome'
   x: number
   y: number
   z: number
@@ -60,6 +60,12 @@ class Ctx {
   }
   cyl(x: number, y: number, z: number, r: number, h: number, color: [number, number, number], moss = 1, rx = 0, ry = 0, rz = 0, emis = 0) {
     this.parts.push({ kind: 'cyl', x, y, z, sx: r, sy: h, sz: r, rx, ry, rz, color, moss, emis })
+  }
+  cone(x: number, y: number, z: number, rx_: number, h: number, color: [number, number, number], moss = 0, emis = 0, ry = 0) {
+    this.parts.push({ kind: 'cone', x, y, z, sx: rx_, sy: h, sz: rx_, rx: 0, ry, rz: 0, color, moss, emis })
+  }
+  sphere(x: number, y: number, z: number, sx: number, sy: number, sz: number, color: [number, number, number], moss = 0, emis = 0) {
+    this.parts.push({ kind: Math.max(sx, sz) > 0.9 ? 'dome' : 'sphere', x, y, z, sx, sy, sz, rx: 0, ry: 0, rz: 0, color, moss, emis })
   }
   col(x: number, z: number, r: number) {
     this.cols.push({ x, z, r })
@@ -307,6 +313,253 @@ function cottage(c: Ctx, broken: boolean) {
   }
 }
 
+
+// ------------------------------------------------------------------------------------------------ villages
+type RGB = [number, number, number]
+const WALLS: RGB[] = [[0.9, 0.82, 0.66], [0.78, 0.86, 0.9], [0.92, 0.76, 0.7], [0.86, 0.8, 0.5], [0.8, 0.72, 0.9]]
+const ROOFS: RGB[] = [[0.7, 0.28, 0.2], [0.85, 0.66, 0.24], [0.2, 0.52, 0.55], [0.5, 0.3, 0.62], [0.76, 0.4, 0.2]]
+const CAPS: RGB[] = [[0.82, 0.18, 0.2], [0.55, 0.28, 0.72], [0.15, 0.55, 0.62], [0.95, 0.5, 0.15]]
+const CREAM: RGB = [0.95, 0.9, 0.78]
+const GRASSY: RGB = [0.3, 0.52, 0.2]
+const PATH: RGB = [0.76, 0.66, 0.46]
+const LAMP: RGB = [1.0, 0.82, 0.4]
+
+/** A local frame (position + yaw) so each house is authored in its own coordinates. */
+class Frame {
+  gy: number
+  cs: number
+  sn: number
+  constructor(public c: Ctx, public wx: number, public wz: number, public Y: number) {
+    this.gy = heightAt(wx, wz)
+    this.cs = Math.cos(Y)
+    this.sn = Math.sin(Y)
+  }
+  p(dx: number, dz: number): [number, number] {
+    return [this.wx + dx * this.cs + dz * this.sn, this.wz - dx * this.sn + dz * this.cs]
+  }
+  box(dx: number, dy: number, dz: number, sx: number, sy: number, sz: number, color: RGB, emis = 0, rz = 0, rx = 0) {
+    const [x, z] = this.p(dx, dz)
+    this.c.box(x, this.gy + dy, z, sx, sy, sz, this.Y, color, 0, emis, rx, rz)
+  }
+  cyl(dx: number, dy: number, dz: number, r: number, h: number, color: RGB, emis = 0, moss = 0) {
+    const [x, z] = this.p(dx, dz)
+    this.c.cyl(x, this.gy + dy, z, r, h, color, moss, 0, 0, 0, emis)
+  }
+  cone(dx: number, dy: number, dz: number, r: number, h: number, color: RGB, moss = 0) {
+    const [x, z] = this.p(dx, dz)
+    this.c.cone(x, this.gy + dy, z, r, h, color, moss)
+  }
+  sphere(dx: number, dy: number, dz: number, sx: number, sy: number, sz: number, color: RGB, moss = 0, emis = 0) {
+    const [x, z] = this.p(dx, dz)
+    this.c.sphere(x, this.gy + dy, z, sx, sy, sz, color, moss, emis)
+  }
+  col(dx: number, dz: number, r: number) {
+    const [x, z] = this.p(dx, dz)
+    this.c.col(x, z, r)
+  }
+  /** door + glowing windows on the +z face */
+  door(dz: number, w = 0.9, h = 1.6) {
+    this.box(0, h / 2, dz, w, h, 0.12, WOOD_DARK)
+    this.box(0, h + 0.05, dz, w + 0.25, 0.14, 0.16, WOOD)
+    this.sphere(w * 0.32, h * 0.5, dz + 0.08, 0.05, 0.05, 0.03, GLOW, 0, 1.5)
+  }
+  window(dx: number, dy: number, dz: number, sx = 0.5, sy = 0.5) {
+    this.box(dx, dy, dz, sx + 0.14, sy + 0.14, 0.1, WOOD)
+    this.box(dx, dy, dz + 0.03, sx, sy, 0.1, GLOW, 1.6)
+  }
+}
+
+function mushroomHouse(f: Frame, rng: () => number) {
+  const cap = CAPS[Math.floor(rng() * CAPS.length)]
+  f.cyl(0, 0.95, 0, 1.0, 1.9, CREAM)
+  f.sphere(0, 2.2, 0, 2.4, 1.15, 2.4, cap)
+  for (let i = 0; i < 7; i++) {
+    const a = rng() * Math.PI * 2
+    const e = 0.35 + rng() * 0.55
+    f.sphere(Math.cos(a) * 2.3 * Math.cos(e) * 0.97, 2.2 + Math.sin(e) * 1.15 * 0.97, Math.sin(a) * 2.3 * Math.cos(e) * 0.97, 0.26, 0.1, 0.26, [0.97, 0.95, 0.9])
+  }
+  f.door(0.97, 0.8, 1.3)
+  f.window(-0.62, 1.3, 0.78, 0.35, 0.35)
+  f.cyl(0, 0.05, 0, 1.3, 0.12, GRASSY, 1)
+  f.col(0, 0, 1.9)
+}
+
+function thatchCottage(f: Frame, rng: () => number) {
+  const wall = WALLS[Math.floor(rng() * WALLS.length)]
+  const roof = ROOFS[Math.floor(rng() * ROOFS.length)]
+  const W = 3.4 + rng() * 0.8
+  const D = 3.0 + rng() * 0.8
+  f.box(0, 0.25, 0, W + 0.3, 0.5, D + 0.3, [0.55, 0.52, 0.46]) // stone footing
+  f.box(0, 0.5 + 0.9, 0, W, 1.8, D, wall)
+  // timber frame lines
+  for (const x of [-W / 2, W / 2]) f.box(x, 1.4, D / 2 + 0.02, 0.14, 1.8, 0.1, WOOD)
+  f.box(0, 2.25, D / 2 + 0.02, W + 0.1, 0.14, 0.1, WOOD)
+  // gabled roof: two long slabs, ridge along z
+  const rise = 1.5
+  const half = W / 2 + 0.5
+  const ang = Math.atan2(rise, half)
+  const len = Math.hypot(half, rise)
+  f.box(-half / 2, 2.3 + rise / 2, 0, len, 0.18, D + 0.9, roof, 0, ang)
+  f.box(half / 2, 2.3 + rise / 2, 0, len, 0.18, D + 0.9, roof, 0, -ang)
+  f.box(0, 2.3 + rise + 0.05, 0, 0.3, 0.18, D + 1.0, WOOD)
+  // gable fill so the ends are closed
+  for (let i = 0; i < 4; i++) f.box(0, 2.3 + 0.2 + i * 0.32, D / 2 - 0.02, W * (1 - i * 0.25), 0.34, 0.12, wall)
+  for (let i = 0; i < 4; i++) f.box(0, 2.3 + 0.2 + i * 0.32, -D / 2 + 0.02, W * (1 - i * 0.25), 0.34, 0.12, wall)
+  f.door(D / 2 + 0.02, 0.85, 1.55)
+  f.window(-W / 2 + 0.75, 1.4, D / 2 + 0.03)
+  f.window(W / 2 - 0.75, 1.4, D / 2 + 0.03)
+  // chimney + flower box
+  f.box(W / 2 - 0.5, 3.3, -0.3, 0.5, 1.6, 0.5, [0.6, 0.55, 0.48])
+  f.box(-W / 2 + 0.75, 0.85, D / 2 + 0.2, 0.7, 0.14, 0.24, WOOD)
+  for (let i = 0; i < 3; i++) f.sphere(-W / 2 + 0.55 + i * 0.2, 0.98, D / 2 + 0.2, 0.08, 0.08, 0.08, ([[1, 0.4, 0.55], [1, 0.9, 0.3], [0.75, 0.5, 1]] as RGB[])[i], 0, 0.3)
+  f.col(-W / 4, 0, Math.max(D, W) * 0.42)
+  f.col(W / 4, 0, Math.max(D, W) * 0.42)
+}
+
+function towerHouse(f: Frame, rng: () => number) {
+  const roof = ROOFS[Math.floor(rng() * ROOFS.length)]
+  const wall = WALLS[Math.floor(rng() * WALLS.length)]
+  f.cyl(0, 0.3, 0, 1.75, 0.6, [0.55, 0.52, 0.46])
+  f.cyl(0, 2.4, 0, 1.45, 4.2, wall)
+  f.cyl(0, 4.6, 0, 1.75, 0.35, WOOD)
+  f.cone(0, 4.75, 0, 2.2, 2.6, roof)
+  f.sphere(0, 7.45, 0, 0.18, 0.18, 0.18, GLOW, 0, 1.8)
+  f.door(1.44, 0.85, 1.5)
+  f.window(0, 2.9, 1.43, 0.4, 0.55)
+  f.window(0, 4.0, 1.43, 0.4, 0.45)
+  f.window(1.1, 3.4, -0.9, 0.4, 0.5)
+  f.box(0, 2.1, 1.9, 1.5, 0.12, 0.8, WOOD) // little porch
+  f.col(0, 0, 1.75)
+}
+
+function hobbitHole(f: Frame, rng: () => number) {
+  f.sphere(0, 0, 0, 3.0, 1.9, 3.0, GRASSY, 1)
+  const door: RGB = rng() < 0.5 ? [0.2, 0.5, 0.55] : [0.7, 0.3, 0.2]
+  f.box(0, 0.85, 2.45, 1.9, 1.7, 0.3, WOOD_DARK)
+  f.sphere(0, 1.7, 2.45, 0.95, 0.4, 0.15, WOOD_DARK)
+  f.box(0, 0.8, 2.6, 1.4, 1.6, 0.14, door)
+  f.sphere(0, 1.6, 2.6, 0.7, 0.35, 0.08, door)
+  f.sphere(0.28, 0.95, 2.62, 0.07, 0.07, 0.05, GLOW, 0, 1.4)
+  f.cyl(1.4, 2.0, -0.6, 0.35, 1.2, [0.58, 0.54, 0.48])
+  f.window(-1.7, 0.9, 1.9, 0.3, 0.3)
+  for (let i = 0; i < 6; i++) {
+    const a = rng() * Math.PI * 2
+    f.sphere(Math.cos(a) * 2.2, 0.9 + rng() * 0.4, Math.sin(a) * 2.2, 0.1, 0.1, 0.1, ([[1, 0.5, 0.6], [1, 0.9, 0.3], [0.9, 0.9, 1]] as RGB[])[i % 3], 0, 0.3)
+  }
+  f.col(0, 0, 2.7)
+}
+
+function windmill(f: Frame) {
+  f.cone(0, 0, 0, 1.9, 5.0, [0.86, 0.8, 0.68])
+  f.cyl(0, 0.2, 0, 2.1, 0.4, [0.55, 0.52, 0.46])
+  f.cone(0, 4.6, 0, 1.4, 1.9, [0.55, 0.3, 0.2])
+  f.door(1.55, 0.8, 1.4)
+  f.window(0, 2.6, 1.0, 0.3, 0.4)
+  f.cyl(0, 4.3, 1.2, 0.2, 0.5, WOOD)
+  const [hx, hz] = f.p(0, 1.55)
+  const hy = f.gy + 4.2
+  const spin = 0.35
+  for (let k = 0; k < 2; k++) {
+    f.c.box(hx, hy, hz, 0.35, 5.2, 0.06, f.Y, [0.85, 0.82, 0.74], 0, 0, 0, spin + (k * Math.PI) / 2)
+    f.c.box(hx, hy, hz, 0.1, 5.2, 0.12, f.Y, WOOD, 0, 0, 0, spin + (k * Math.PI) / 2)
+  }
+  f.sphere(0, 4.2, 1.55, 0.2, 0.2, 0.2, WOOD_DARK)
+  f.col(0, 0, 1.9)
+}
+
+function stall(f: Frame, rng: () => number) {
+  const a = ROOFS[Math.floor(rng() * ROOFS.length)]
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) f.cyl(sx * 1.2, 1.0, sz * 0.8, 0.07, 2.0, WOOD)
+  for (let i = 0; i < 6; i++) f.box(-1.0 + i * 0.4, 2.1 + 0.02, 0, 0.4, 0.07, 2.1, i % 2 ? [0.95, 0.92, 0.85] : a, 0, 0.18)
+  f.box(0, 0.5, 0.35, 2.3, 0.9, 0.7, WOOD)
+  const goods: RGB[] = [[0.9, 0.2, 0.15], [0.95, 0.75, 0.2], [0.4, 0.7, 0.25], [0.8, 0.45, 0.2]]
+  for (let i = 0; i < 6; i++) f.sphere(-0.9 + i * 0.36, 1.05, 0.35, 0.13, 0.13, 0.13, goods[Math.floor(rng() * goods.length)])
+  f.box(-1.5, 0.3, -0.6, 0.5, 0.6, 0.5, WOOD_DARK)
+  f.col(0, 0.35, 1.3)
+}
+
+function well(f: Frame) {
+  f.cyl(0, 0.45, 0, 1.15, 0.9, [0.62, 0.58, 0.5])
+  f.cyl(0, 0.92, 0, 0.9, 0.06, [0.2, 0.45, 0.55], 0.6)
+  for (const s of [-1, 1]) f.box(s * 1.0, 1.6, 0, 0.12, 1.5, 0.12, WOOD)
+  f.box(0, 2.45, 0, 2.3, 0.12, 0.12, WOOD)
+  f.cone(0, 2.5, 0, 1.5, 0.85, ROOFS[0])
+  f.col(0, 0, 1.2)
+}
+
+function lamp(f: Frame) {
+  f.cyl(0, 1.0, 0, 0.06, 2.0, WOOD_DARK)
+  f.box(0, 2.15, 0, 0.3, 0.34, 0.3, LAMP, 2.0)
+  f.cone(0, 2.32, 0, 0.26, 0.2, WOOD_DARK)
+  f.col(0, 0, 0.12)
+}
+
+function village(c: Ctx) {
+  const rng = c.rng
+  const cx = c.site.x
+  const cz = c.site.z
+  // plaza + well
+  const plaza = new Frame(c, cx, cz, c.yaw)
+  c.cyl(cx, plaza.gy + 0.04, cz, 5.6, 0.1, PATH, 0)
+  c.cyl(cx, plaza.gy + 0.07, cz, 3.2, 0.1, [0.7, 0.62, 0.5], 0)
+  well(plaza)
+  for (let i = 0; i < 4; i++) {
+    const a = (i / 4) * Math.PI * 2 + Math.PI / 4
+    lamp(new Frame(c, cx + Math.cos(a) * 4.6, cz + Math.sin(a) * 4.6, 0))
+  }
+  // houses around the plaza, each turned to face the centre
+  const kinds: ((f: Frame, r: () => number) => void)[] = [mushroomHouse, thatchCottage, towerHouse, hobbitHole, thatchCottage, mushroomHouse, towerHouse, hobbitHole]
+  const n = 7
+  const start = rng() * Math.PI * 2
+  const order = kinds.slice(0, n).sort(() => rng() - 0.5)
+  for (let i = 0; i < n; i++) {
+    const a = start + (i / n) * Math.PI * 2 + (rng() - 0.5) * 0.25
+    const r = 10.5 + rng() * 2.5
+    const hx = cx + Math.cos(a) * r
+    const hz = cz + Math.sin(a) * r
+    // local +z must point at the plaza: rotate so that (sinY, cosY) = direction to centre
+    const toC = Math.atan2(cx - hx, cz - hz)
+    // three.js rotation about Y maps local +z to (sin Y, cos Y) in world x,z, so Y = atan2(dx, dz)
+    const f = new Frame(c, hx, hz, toC)
+    order[i](f, rng)
+    // path from plaza to door
+    for (let s = 0; s < 4; s++) {
+      const t = 0.18 + s * 0.15
+      c.cyl(cx + (hx - cx) * (1 - t), heightAt(cx + (hx - cx) * (1 - t), cz + (hz - cz) * (1 - t)) + 0.05, cz + (hz - cz) * (1 - t), 0.9, 0.08, PATH, 0)
+    }
+    // yard bits
+    const bx = hx + Math.cos(a + 0.5) * 2.8
+    const bz = hz + Math.sin(a + 0.5) * 2.8
+    const bf = new Frame(c, bx, bz, rng() * 6)
+    if (rng() < 0.5) {
+      bf.cyl(0, 0.35, 0, 0.32, 0.7, WOOD) // barrel
+      bf.cyl(0.7, 0.2, 0.2, 0.28, 0.4, WOOD_DARK)
+      bf.col(0.3, 0.1, 0.7)
+    } else {
+      bf.box(0, 0.3, 0, 0.7, 0.6, 0.6, [0.88, 0.76, 0.35]) // hay
+      bf.box(0.8, 0.25, 0.1, 0.6, 0.5, 0.6, [0.84, 0.72, 0.32])
+      bf.col(0.4, 0.05, 0.8)
+    }
+  }
+  // market stalls + windmill on the outskirts
+  stall(new Frame(c, cx + Math.cos(start + 0.4) * 5.8, cz + Math.sin(start + 0.4) * 5.8, Math.atan2(-Math.cos(start + 0.4), -Math.sin(start + 0.4))), rng)
+  stall(new Frame(c, cx + Math.cos(start + 3.5) * 5.8, cz + Math.sin(start + 3.5) * 5.8, Math.atan2(-Math.cos(start + 3.5), -Math.sin(start + 3.5))), rng)
+  const wa = start + Math.PI * (0.55 + rng() * 0.2)
+  windmill(new Frame(c, cx + Math.cos(wa) * 17, cz + Math.sin(wa) * 17, Math.atan2(-Math.cos(wa), -Math.sin(wa))))
+  // fence ring segments (with gaps) around the outside
+  for (let i = 0; i < 26; i++) {
+    const a = (i / 26) * Math.PI * 2
+    if (i % 5 === 0) continue
+    const fx = cx + Math.cos(a) * 18.5
+    const fz = cz + Math.sin(a) * 18.5
+    const ff = new Frame(c, fx, fz, Math.atan2(-Math.sin(a), Math.cos(a)) + Math.PI / 2 - Math.PI / 2)
+    ff.cyl(0, 0.45, 0, 0.07, 0.9, WOOD)
+    ff.box(0.6, 0.65, 0, 1.2, 0.08, 0.06, WOOD_DARK)
+    ff.box(0.6, 0.35, 0, 1.2, 0.08, 0.06, WOOD_DARK)
+    ff.col(0.5, 0, 0.5)
+  }
+}
+
 const GEN: Record<Site['type'], (c: Ctx) => void> = {
   ruinCourt: (c) => ruinCourt(c),
   cottage: (c) => cottage(c, false),
@@ -314,6 +567,7 @@ const GEN: Record<Site['type'], (c: Ctx) => void> = {
   stoneCircle: (c) => stoneCircle(c, c.rng() < 0.6),
   shrine: (c) => shrine(c, c.rng() < 0.4),
   archway: (c) => archway(c, c.rng() < 0.55),
+  village: (c) => village(c),
 }
 
 const cache = new Map<string, SiteGeometry>()

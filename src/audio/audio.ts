@@ -208,6 +208,19 @@ export const audio = {
     }
   },
 
+  jump() {
+    burst({ type: 'lowpass', f: 380, q: 0.7, peak: 0.07, attack: 0.01, decay: 0.12 })
+    tone({ f: 260, f2: 520, type: 'sine', peak: 0.03, decay: 0.12 })
+  },
+
+  land(surface: 'grass' | 'water') {
+    if (surface === 'water') burst({ f: 600, f2: 1600, q: 0.8, peak: 0.2, attack: 0.01, decay: 0.3 })
+    else {
+      burst({ type: 'lowpass', f: 220, q: 0.7, peak: 0.16, attack: 0.003, decay: 0.12 })
+      burst({ f: 2600, q: 0.7, peak: 0.07, attack: 0.003, decay: 0.1 })
+    }
+  },
+
   swing(kind: 'light' | 'heavy' | 'thrust' | 'spin', pitch = 1) {
     if (!ctx) return
     if (kind === 'light') burst({ f: 1400 * pitch, f2: 4200 * pitch, q: 2.2, peak: 0.22, attack: 0.03, decay: 0.16 })

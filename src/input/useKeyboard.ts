@@ -6,6 +6,12 @@ const MOVE_KEYS = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown
 export function useKeyboard() {
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
+      if (e.code === 'Space') {
+        e.preventDefault()
+        if (!e.repeat) input.jump = 0.15
+        input.used = true
+        return
+      }
       if (!MOVE_KEYS.has(e.code)) return
       input.keys.add(e.code)
       input.used = true

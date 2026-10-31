@@ -277,6 +277,9 @@ function fallObjects(cx: number, cz: number) {
 }
 
 // ---------------------------------------------------------------------------------------------- grass
+const villageSites = world.sites.filter((s) => s.type === 'village')
+const inVillage = (x: number, z: number) => villageSites.some((v) => Math.hypot(v.x - x, v.z - z) < 16)
+
 function* grassStep(cx: number, cz: number, q: QualitySettings, group: THREE.Group): Generator<void> {
   const rng = mulberry32(hashInts(cx, cz, WORLD_SEED, 11))
   const x0 = cx * CHUNK_SIZE
@@ -295,6 +298,7 @@ function* grassStep(cx: number, cz: number, q: QualitySettings, group: THREE.Gro
     if (shore > 0.72) continue
     if (slopeAt(x, z) > 0.9) continue
     const clear = siteClearance(x, z)
+    if (inVillage(x, z) && a > 0.06) continue
     const dens = Math.min(1, 0.55 + meadowMask(x, z) * 0.35 + (1 - forestMask(x, z)) * 0.2) * (1 - shore * 0.85) * (clear < 0 ? 0.35 : 1)
     if (a > dens) continue
     keep.push(x, z, b, c, rng())
@@ -442,7 +446,7 @@ function addLily(b: PropBatch, l: ReturnType<typeof getChunkData>['lilies'][numb
   }
 }
 
-const TPL_BY_KIND: Record<string, Template> = { box: TPL.box, cyl: TPL.cyl, cone: TPL.cone, sphere: TPL.sphere }
+const TPL_BY_KIND: Record<string, Template> = { box: TPL.box, cyl: TPL.cyl, cone: TPL.cone, sphere: TPL.sphere, dome: TPL.dome }
 
 function* propsStep(cx: number, cz: number, q: QualitySettings, group: THREE.Group): Generator<void> {
   const data = getChunkData(cx, cz)

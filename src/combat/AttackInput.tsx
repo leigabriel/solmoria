@@ -9,12 +9,13 @@ import { combat, requestAttack, type AttackKind } from './state'
  * Controls
  *   Left click / J    light slash (click again to chain a 3-hit combo)
  *   Right click / K   heavy overhead slam
- *   Space / E         dash thrust
+ *   E                 dash thrust
+ *   Space             jump
  *   Q / R             spin slash
  * The blade swings toward the mouse pointer; on touch, toward the move direction.
  */
 const pointer = { x: 0, y: 0, active: false }
-const KEYS: Record<string, AttackKind> = { KeyJ: 'light', KeyK: 'heavy', Space: 'thrust', KeyE: 'thrust', KeyQ: 'spin', KeyR: 'spin' }
+const KEYS: Record<string, AttackKind> = { KeyJ: 'light', KeyK: 'heavy', KeyE: 'thrust', KeyQ: 'spin', KeyR: 'spin' }
 const _v = new THREE.Vector3()
 
 export function AttackInput() {
@@ -42,7 +43,7 @@ export function AttackInput() {
       audio.start()
       const k = KEYS[e.code]
       const h = useHud.getState()
-      if (h.menuOpen || h.bagOpen) return
+      if (h.menuOpen || h.bagOpen || h.mapOpen) return
       if (!k || e.repeat) return
       e.preventDefault()
       requestAttack(k)

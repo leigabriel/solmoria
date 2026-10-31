@@ -40,6 +40,8 @@ export const playerState = {
   vel: new THREE.Vector3(),
   speed: 0,
   facing: 0,
+  vy: 0,
+  grounded: true,
 }
 
 export const input = {
@@ -47,6 +49,8 @@ export const input = {
   joyX: 0,
   joyY: 0,
   used: false,
+  /** seconds the jump press stays buffered */
+  jump: 0,
 }
 
 interface Hud {
@@ -54,9 +58,11 @@ interface Hud {
   maxHp: number
   menuOpen: boolean
   bagOpen: boolean
+  mapOpen: boolean
   volume: number
   setMenu: (v: boolean) => void
   setBag: (v: boolean) => void
+  setMap: (v: boolean) => void
   setVolume: (v: number) => void
 }
 
@@ -76,9 +82,11 @@ export const useHud = create<Hud>((set) => ({
   maxHp: 100,
   menuOpen: false,
   bagOpen: false,
+  mapOpen: false,
   volume: initialVolume(),
-  setMenu: (menuOpen) => set({ menuOpen, bagOpen: false }),
-  setBag: (bagOpen) => set({ bagOpen, menuOpen: false }),
+  setMenu: (menuOpen) => set({ menuOpen, bagOpen: false, mapOpen: false }),
+  setBag: (bagOpen) => set({ bagOpen, menuOpen: false, mapOpen: false }),
+  setMap: (mapOpen) => set({ mapOpen, menuOpen: false, bagOpen: false }),
   setVolume: (volume) => {
     try {
       localStorage.setItem(VOL_KEY, String(volume))

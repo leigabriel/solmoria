@@ -7,6 +7,7 @@ import { Pollen } from '../atmosphere/Pollen'
 import { CameraRig } from '../player/CameraRig'
 import { NameTagDriver } from '../ui/NameTag'
 import { Player } from '../player/Player'
+import { NpcBubbleDriver } from '../ui/NpcBubble'
 import { Animals } from '../animals/Animals'
 import { AttackInput } from '../combat/AttackInput'
 import { CombatFX } from '../combat/CombatFX'
@@ -40,6 +41,7 @@ export function Game() {
       <AudioDriver />
       <CameraRig />
       <NameTagDriver />
+      <NpcBubbleDriver />
       {q.godRays && <GodRays />}
       <AdaptiveRes max={Math.min(q.dpr, typeof window === 'undefined' ? 1 : window.devicePixelRatio)} />
       <Pollen />

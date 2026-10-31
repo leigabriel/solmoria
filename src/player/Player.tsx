@@ -2,7 +2,7 @@ import { useEffect, useMemo } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { PLAYER } from '../game/config'
-import { playerState } from '../game/store'
+import { input, playerState } from '../game/store'
 import { readMove } from '../input/useKeyboard'
 import { sharedUniforms } from '../shaders/materials'
 import { depthAt, heightAt, WORLD_HALF, world } from '../world/terrainData'
@@ -88,7 +88,30 @@ export function Player() {
     pos.x = Math.max(-lim, Math.min(lim, pos.x))
     pos.z = Math.max(-lim, Math.min(lim, pos.z))
     resolveCollisions(pos, PLAYER.radius)
-    pos.y = damp(pos.y, heightAt(pos.x, pos.z), 18, dt)
+    // vertical: grounded follows the terrain; jump launches with gravity, landing plays a thud
+    const ground = heightAt(pos.x, pos.z)
+    if (input.jump > 0) input.jump -= dt
+    if (playerState.grounded) {
+      if (input.jump > 0) {
+        playerState.grounded = false
+        playerState.vy = 6.2
+        input.jump = 0
+        audio.jump()
+      } else if (pos.y - ground > 0.35) {
+        playerState.grounded = false // walked off a ledge
+        playerState.vy = 0
+      } else pos.y = damp(pos.y, ground, 18, dt)
+    }
+    if (!playerState.grounded) {
+      playerState.vy -= 17 * dt
+      pos.y += playerState.vy * dt
+      if (pos.y <= ground && playerState.vy <= 0) {
+        pos.y = ground
+        playerState.grounded = true
+        playerState.vy = 0
+        audio.land(depthAt(pos.x, pos.z) > 0.06 ? 'water' : 'grass')
+      }
+    }
 
     const speed = Math.hypot(vel.x, vel.z)
     playerState.speed = speed
@@ -106,8 +129,9 @@ export function Player() {
       dt,
       state.clock.elapsedTime,
       attacking ? { kind: combat.kind!, step: combat.step, u: combat.u, hitFrom: combat.def.hitFrom, hitTo: combat.def.hitTo } : null,
+      playerState.grounded ? 0 : 1,
     )
-    if (speed > 0.9 && !attacking && Math.floor(rig.phase / Math.PI) !== prevPhase) {
+    if (speed > 0.9 && !attacking && playerState.grounded && Math.floor(rig.phase / Math.PI) !== prevPhase) {
       audio.step(depthAt(pos.x, pos.z) > 0.06 ? 'water' : 'grass', speed > 3.6)
     }
     sharedUniforms.uPlayer.value.copy(pos)

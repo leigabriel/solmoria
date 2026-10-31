@@ -6,7 +6,8 @@ import { WORLD_SEED } from '../game/config'
 import { playerState } from '../game/store'
 import { mulberry32 } from '../utils/random'
 import { forestMask, meadowMask } from '../world/biome'
-import { depthAt, heightAt, shoreAt, siteClearance, slopeAt, world, WORLD_HALF } from '../world/terrainData'
+import { depthAt, heightAt, shoreAt, siteClearance, slopeAt, world, WORLD_HALF, type Site } from '../world/terrainData'
+import { siteGeometry } from '../world/structures'
 import { makeSpecies, type SpeciesDef } from './species'
 
 interface Animal {
@@ -25,9 +26,38 @@ interface Animal {
   speed: number
   voice: number
   hop: number
+  /** villagers keep to their village and avoid its buildings */
+  home?: Site
+  name?: string
+  lineSeed?: number
 }
 
+const NPC_NAMES = ['Pip', 'Mara', 'Tobin', 'Elsie', 'Barnaby', 'Willa', 'Odo', 'Nell', 'Fenn', 'Juniper', 'Rook', 'Tansy', 'Bram', 'Posy']
+
 const animals: Animal[] = []
+
+/** Closest villager within `r` (for the dialogue bubble). */
+export function nearestNpc(x: number, z: number, r: number) {
+  let best: Animal | null = null
+  let bd = r
+  for (const a of animals) {
+    if (!a.sp.npc) continue
+    const d = Math.hypot(a.x - x, a.z - z)
+    if (d < bd) {
+      bd = d
+      best = a
+    }
+  }
+  return best ? { x: best.x, y: heightAt(best.x, best.z), z: best.z, name: best.name!, title: best.sp.npc!.title, lines: best.sp.npc!.lines, seed: best.lineSeed! } : null
+}
+
+function villagerOk(a: Animal, x: number, z: number) {
+  const site = a.home!
+  if (Math.hypot(x - site.x, z - site.z) > 17.5) return false
+  if (depthAt(x, z) > 0.04 || slopeAt(x, z) > 0.7) return false
+  for (const c of siteGeometry(site).cols) if (Math.hypot(c.x - x, c.z - z) < c.r + 0.4) return false
+  return true
+}
 
 /** Called by sword strikes: animals nearby bolt away. */
 export function scareAnimals(x: number, z: number, r: number) {
@@ -65,9 +95,9 @@ function populate() {
   animals.length = 0
   const sp = makeSpecies()
   const rng = mulberry32(WORLD_SEED ^ 0xa11ce)
-  const counts: Record<string, number> = { cow: 0, horse: 0, sheep: 0, chicken: 0, deer: 0, duck: 0 }
+  const counts: Record<string, number> = {}
   const add = (s: SpeciesDef, x: number, z: number, hx = x, hz = z) => {
-    counts[s.id]++
+    counts[s.id] = (counts[s.id] ?? 0) + 1
     animals.push({ sp: s, i: 0, x, z, hx, hz, yaw: rng() * 6.28, tx: x, tz: z, mode: 0, timer: rng() * 4, gait: rng() * 6, speed: 0, voice: 8 + rng() * 30, hop: rng() * 6 })
   }
   const herd = (s: SpeciesDef, herds: number, size: number, pick: (x: number, z: number) => boolean, maxSlope = 0.35) => {
@@ -89,10 +119,44 @@ function populate() {
       if (n) placed++
     }
   }
-  herd(sp.cow, 5, 4, (x, z) => meadowMask(x, z) > 0.4 && forestMask(x, z) < 0.6)
-  herd(sp.horse, 4, 3, (x, z) => heightAt(x, z) > 2 && forestMask(x, z) < 0.65, 0.3)
-  herd(sp.sheep, 5, 5, (x, z) => heightAt(x, z) > 1 && meadowMask(x, z) > 0.3, 0.4)
-  herd(sp.deer, 4, 3, (x, z) => forestMask(x, z) > 0.5, 0.45)
+  herd(sp.cow, 9, 4, (x, z) => meadowMask(x, z) > 0.4 && forestMask(x, z) < 0.6)
+  herd(sp.horse, 7, 3, (x, z) => heightAt(x, z) > 2 && forestMask(x, z) < 0.65, 0.3)
+  herd(sp.sheep, 9, 6, (x, z) => heightAt(x, z) > 1 && meadowMask(x, z) > 0.3, 0.4)
+  herd(sp.deer, 7, 3, (x, z) => forestMask(x, z) > 0.5, 0.45)
+  herd(sp.rabbit, 14, 3, (x, z) => meadowMask(x, z) > 0.25, 0.5)
+  // villagers wander inside their village; a few chickens and a hound-less yard feel
+  for (const site of world.sites) {
+    if (site.type !== 'village') continue
+    const mix = [sp.farmer, sp.farmer, sp.elder, sp.merchant, sp.child, sp.child, sp.guard]
+    const count = 6 + Math.floor(rng() * 3)
+    for (let k = 0; k < count; k++) {
+      for (let tries = 0; tries < 40; tries++) {
+        const a = rng() * 6.28
+        const r = 2 + rng() * 13
+        const x = site.x + Math.cos(a) * r
+        const z = site.z + Math.sin(a) * r
+        const probe: Animal = { sp: mix[k % mix.length], i: 0, x, z, hx: site.x, hz: site.z, yaw: rng() * 6.28, tx: x, tz: z, mode: 0, timer: rng() * 4, gait: 0, speed: 0, voice: 99, hop: rng() * 6, home: site }
+        if (villagerOk(probe, x, z)) {
+          counts[probe.sp.id] = (counts[probe.sp.id] ?? 0) + 1
+          probe.name = NPC_NAMES[Math.floor(rng() * NPC_NAMES.length)]
+          probe.lineSeed = Math.floor(rng() * 100)
+          animals.push(probe)
+          break
+        }
+      }
+    }
+    for (let k = 0; k < 6; k++) {
+      const a = rng() * 6.28
+      const r = 3 + rng() * 11
+      const x = site.x + Math.cos(a) * r
+      const z = site.z + Math.sin(a) * r
+      const probe: Animal = { sp: sp.chicken, i: 0, x, z, hx: site.x, hz: site.z, yaw: rng() * 6.28, tx: x, tz: z, mode: 0, timer: rng() * 4, gait: 0, speed: 0, voice: 8 + rng() * 30, hop: rng() * 6, home: site }
+      if (villagerOk(probe, x, z)) {
+        counts.chicken = (counts.chicken ?? 0) + 1
+        animals.push(probe)
+      }
+    }
+  }
   // chickens scratch around cottages
   for (const site of world.sites) {
     if (site.type !== 'cottage' && site.type !== 'cottageRuin') continue
@@ -108,7 +172,7 @@ function populate() {
   for (const lk of world.stats.lakes) {
     if (lk.area < 200) continue
     let n = 0
-    for (let k = 0; k < 60 && n < 3; k++) {
+    for (let k = 0; k < 60 && n < 4; k++) {
       const x = lk.x + (rng() - 0.5) * Math.sqrt(lk.area) * 0.6
       const z = lk.z + (rng() - 0.5) * Math.sqrt(lk.area) * 0.6
       if (depthAt(x, z) > 0.5) {
@@ -201,7 +265,7 @@ function Ground() {
       if (a.speed > 0.02) {
         const nx = a.x + Math.sin(a.yaw) * a.speed * dt
         const nz = a.z + Math.cos(a.yaw) * a.speed * dt
-        const ok = s.swim ? depthAt(nx, nz) > 0.4 : okLand(nx, nz, 0.55)
+        const ok = s.swim ? depthAt(nx, nz) > 0.4 : a.home ? villagerOk(a, nx, nz) : okLand(nx, nz, 0.55)
         if (ok) {
           a.x = nx
           a.z = nz
@@ -265,8 +329,8 @@ function Ground() {
 }
 
 // ---------------------------------------------------------------------------------------------- air
-const BIRDS = 28
-const FLOCKS = 4
+const BIRDS = 48
+const FLOCKS = 6
 
 function Birds() {
   const { body, wingL, wingR, flock } = useMemo(() => {
@@ -336,7 +400,7 @@ function Birds() {
   )
 }
 
-const FLIES = 36
+const FLIES = 60
 
 /** Glowing butterflies drifting around the player (recycled), so meadows always feel alive. */
 function Butterflies() {

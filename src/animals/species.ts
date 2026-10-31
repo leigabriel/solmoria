@@ -21,6 +21,8 @@ export interface SpeciesDef {
   voice?: 'moo' | 'neigh' | 'cluck' | 'chirp'
   tints: number[]
   scale: number
+  /** villagers: shown with a name and a line of dialogue when the player is close */
+  npc?: { title: string; lines: string[] }
 }
 
 const _m = new THREE.Matrix4()
@@ -30,7 +32,8 @@ const _p = new THREE.Vector3()
 const _s = new THREE.Vector3()
 const TPLS = { box: TPL.box, sphere: TPL.sphere, cyl: TPL.cyl, cone: TPL.cone }
 
-function build(parts: [Kind, V3, V3, [number, number, number], V3?][]) {
+type PartDef = [Kind, V3, V3, [number, number, number], V3?]
+function build(parts: PartDef[]) {
   const b = new PropBatch()
   for (const [k, pos, sc, col, rot] of parts) {
     _e.set(rot?.[0] ?? 0, rot?.[1] ?? 0, rot?.[2] ?? 0)
@@ -147,6 +150,62 @@ function duck(): SpeciesDef {
   return { id: 'duck', body, leg: null, hips: [], walk: 0.5, flee: 2.6, swing: 0, home: 8, swim: true, voice: 'chirp', tints: [0xffffff, 0xd8c0a0, 0xf4f4ee], scale: 1 }
 }
 
+/** Plump villagers in the same chubby style as the hero, each with a trade-defining hat. */
+function blobNpc(id: string, body: [number, number, number], hat: (add: (p: PartDef) => void) => void, npc: SpeciesDef['npc'], scale = 1.3): SpeciesDef {
+  const parts: PartDef[] = [
+    ['sphere', [0, 0.52, 0], [0.24, 0.32, 0.22], body],
+    ['sphere', [-0.075, 0.68, 0.19], [0.014, 0.02, 0.01], DARK],
+    ['sphere', [0.075, 0.68, 0.19], [0.014, 0.02, 0.01], DARK],
+    ['sphere', [0, 0.63, 0.205], [0.012, 0.008, 0.006], DARK],
+    ['cyl', [-0.24, 0.5, 0.02], [0.05, 0.2, 0.05], body, [0, 0, 0.35]],
+    ['cyl', [0.24, 0.5, 0.02], [0.05, 0.2, 0.05], body, [0, 0, -0.35]],
+  ]
+  hat((p) => parts.push(p))
+  const leg = build([['cyl', [0, -0.09, 0], [0.065, 0.18, 0.065], body], ['sphere', [0, -0.18, 0.03], [0.075, 0.04, 0.1], [0.25, 0.18, 0.12]]])
+  return { id, body: build(parts), leg, hips: [[-0.1, 0.22, 0, 0], [0.1, 0.22, 0, Math.PI]], walk: 0.8, flee: 1.6, swing: 0.55, home: 9, tints: [0xffffff], scale, npc }
+}
+
+function villagers() {
+  return {
+    farmer: blobNpc('farmer', [0.96, 0.92, 0.8], (a) => {
+      a(['cone', [0, 0.86, 0], [0.34, 0.12, 0.34], [0.93, 0.78, 0.3]])
+      a(['box', [0, 0.28, 0.2], [0.3, 0.3, 0.05], [0.4, 0.55, 0.28]])
+    }, { title: 'Farmer', lines: ['The grass is tall this year.', 'Mind the cows, they wander.', 'Fine day for the harvest.'] }),
+    elder: blobNpc('elder', [0.9, 0.9, 0.95], (a) => {
+      a(['cone', [0, 0.82, 0], [0.22, 0.55, 0.22], [0.3, 0.32, 0.7]])
+      a(['sphere', [0, 0.95, 0], [0.04, 0.04, 0.04], [1, 0.9, 0.4]])
+      a(['cone', [0, 0.52, 0.2], [0.1, 0.3, 0.06], [0.97, 0.97, 0.97], [Math.PI, 0, 0]])
+    }, { title: 'Elder', lines: ['Falls to the west sing at night.', 'Old ruins hold old secrets.', 'Walk softly, wanderer.'] }),
+    merchant: blobNpc('merchant', [0.86, 0.72, 0.52], (a) => {
+      a(['sphere', [0, 0.88, 0], [0.22, 0.14, 0.22], [0.8, 0.18, 0.2]])
+      a(['sphere', [0.18, 0.3, 0.12], [0.08, 0.09, 0.08], [0.45, 0.3, 0.15]])
+    }, { title: 'Merchant', lines: ['Fine wares, fair prices!', 'Nothing in stock just yet.', 'Come back with coin.'] }),
+    child: blobNpc('child', [0.97, 0.9, 0.88], (a) => {
+      a(['sphere', [0.08, 0.9, 0.05], [0.07, 0.05, 0.05], [1, 0.45, 0.6]])
+      a(['sphere', [-0.08, 0.9, 0.05], [0.07, 0.05, 0.05], [1, 0.45, 0.6]])
+    }, { title: 'Child', lines: ['Wow, a real sword!', 'Can you chase the chickens?', 'I saw a glowing deer!'] }, 0.95),
+    guard: blobNpc('guard', [0.72, 0.76, 0.84], (a) => {
+      a(['sphere', [0, 0.85, 0], [0.25, 0.17, 0.25], [0.55, 0.57, 0.62]])
+      a(['cone', [0, 1.0, -0.05], [0.04, 0.2, 0.04], [0.8, 0.15, 0.15]])
+      a(['cyl', [0.32, 0.8, 0.1], [0.018, 1.7, 0.018], [0.4, 0.28, 0.16]])
+      a(['cone', [0.32, 1.64, 0.1], [0.04, 0.14, 0.04], [0.85, 0.87, 0.9]])
+    }, { title: 'Guard', lines: ['All quiet in the village.', 'Keep that blade sheathed indoors.', 'Beasts roam beyond the fence.'] }),
+  }
+}
+
+function rabbit(): SpeciesDef {
+  const FUR: V3 = [0.72, 0.62, 0.5]
+  const body = build([
+    ['sphere', [0, 0.17, 0], [0.1, 0.1, 0.15], FUR],
+    ['sphere', [0, 0.25, 0.14], [0.065, 0.065, 0.07], FUR],
+    ['cyl', [-0.03, 0.4, 0.13], [0.018, 0.15, 0.012], FUR, [-0.2, 0, 0.1]],
+    ['cyl', [0.03, 0.4, 0.13], [0.018, 0.15, 0.012], FUR, [-0.2, 0, -0.1]],
+    ['sphere', [0, 0.18, -0.15], [0.04, 0.04, 0.04], [0.97, 0.95, 0.9]],
+  ])
+  const leg = build([['cyl', [0, -0.05, 0], [0.025, 0.1, 0.025], FUR]])
+  return { id: 'rabbit', body, leg, hips: [[-0.05, 0.1, 0.07, 0], [0.05, 0.1, 0.07, 0], [-0.05, 0.1, -0.08, Math.PI], [0.05, 0.1, -0.08, Math.PI]], walk: 0.9, flee: 4.2, swing: 0.8, home: 8, tints: [0xffffff, 0xd9c8b0, 0xb8a58a, 0xf0ece4], scale: 1 }
+}
+
 export function makeSpecies() {
-  return { cow: cow(), horse: horse(), sheep: sheep(), chicken: chicken(), deer: deer(), duck: duck() }
+  return { rabbit: rabbit(), cow: cow(), horse: horse(), sheep: sheep(), chicken: chicken(), deer: deer(), duck: duck(), ...villagers() }
 }

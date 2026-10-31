@@ -20,7 +20,7 @@ export const VERTS = GRID + 1
 export const SEA_LEVEL = -0.4
 export const NO_WATER = -1e9
 
-export type SiteType = 'ruinCourt' | 'cottage' | 'cottageRuin' | 'stoneCircle' | 'shrine' | 'archway'
+export type SiteType = 'ruinCourt' | 'cottage' | 'cottageRuin' | 'stoneCircle' | 'shrine' | 'archway' | 'village'
 
 export interface Site {
   x: number
@@ -91,6 +91,7 @@ const SITE_RADIUS: Record<SiteType, number> = {
   stoneCircle: 8,
   shrine: 5,
   archway: 5,
+  village: 19,
 }
 
 export function generateWorld(seed: number): WorldData {
@@ -567,7 +568,7 @@ export function generateWorld(seed: number): WorldData {
     return (arr[i] * (1 - tx) + arr[i + 1] * tx) * (1 - tz) + (arr[i + VERTS] * (1 - tx) + arr[i + VERTS + 1] * tx) * tz
   }
   const sites: Site[] = []
-  const suitable = (x: number, z: number, r: number) => {
+  const suitable = (x: number, z: number, r: number, tol = 1.6) => {
     if (Math.abs(x) > H - 40 || Math.abs(z) > H - 40) return false
     const h0 = bil(h, x, z)
     if (h0 < SEA_LEVEL + 1.5) return false
@@ -577,7 +578,7 @@ export function generateWorld(seed: number): WorldData {
         const px = x + Math.cos(a) * rr
         const pz = z + Math.sin(a) * rr
         if (bil(shore, px, pz) > 0.001 || bil(depth, px, pz) > 0) return false
-        if (Math.abs(bil(h, px, pz) - h0) > (rr <= r ? 1.6 : 3)) return false
+        if (Math.abs(bil(h, px, pz) - h0) > (rr <= r ? tol : tol + 1.4)) return false
       }
     }
     return sites.every((s) => Math.hypot(s.x - x, s.z - z) > s.radius + r + 14)
@@ -601,6 +602,38 @@ export function generateWorld(seed: number): WorldData {
       }
     }
     sites.push({ x, z, y, type, seed: sd, radius: r })
+  }
+  const villageOk = (x: number, z: number) => {
+    if (Math.abs(x) > H - 50 || Math.abs(z) > H - 50) return false
+    const h0 = bil(h, x, z)
+    if (h0 < SEA_LEVEL + 1.5 || h0 > 16) return false
+    for (const rr of [0, 6, 12, 18, 24]) {
+      for (let k = 0; k < (rr === 0 ? 1 : 12); k++) {
+        const a = (k / 12) * Math.PI * 2
+        const px = x + Math.cos(a) * rr
+        const pz = z + Math.sin(a) * rr
+        if (rr <= 18 && bil(depth, px, pz) > 0) return false
+        if (rr <= 12 && bil(shore, px, pz) > 0.001) return false
+        if (Math.abs(bil(h, px, pz) - h0) > (rr <= 12 ? 2.8 : 6)) return false
+      }
+    }
+    return sites.every((s) => Math.hypot(s.x - x, s.z - z) > s.radius + SITE_RADIUS.village + 14)
+  }
+  // villages first (they need the most flat ground), spread across the map
+  const VILLAGE_ANCHORS: [number, number][] = [[54, 24], [-64, -30], [-84, 72], [106, 56], [-134, -84], [150, -72], [24, 132], [-20, -120]]
+  for (const [ax, az] of VILLAGE_ANCHORS) {
+    let done = false
+    for (let rad = 0; rad <= 130 && !done; rad += 4) {
+      for (let k = 0; k < (rad === 0 ? 1 : 20) && !done; k++) {
+        const a = (k / 20) * Math.PI * 2
+        const x = Math.round(ax + Math.cos(a) * rad)
+        const z = Math.round(az + Math.sin(a) * rad)
+        if (villageOk(x, z)) {
+          addSite(x, z, 'village', hashInts(x, z, seed, 77))
+          done = true
+        }
+      }
+    }
   }
   // a couple of guaranteed landmarks near the spawn point so there is something to find straight away
   const forced: [SiteType, number, number][] = [['ruinCourt', -26, 16], ['archway', 16, -10], ['stoneCircle', 30, 42]]

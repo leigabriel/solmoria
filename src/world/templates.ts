@@ -83,6 +83,7 @@ export const TPL = {
   discUp: T(new THREE.CircleGeometry(1, 8).rotateX(-Math.PI / 2)),
   discTilt: T(new THREE.CircleGeometry(1, 8).rotateX(-Math.PI / 2 + 0.9)),
   sphere: T(new THREE.SphereGeometry(1, 6, 5)),
+  dome: T(new THREE.SphereGeometry(1, 14, 9)),
   rock: T(new THREE.DodecahedronGeometry(1, 0)),
   petals6: T(petalStar(6, 0.12)),
   petals9: T(petalStar(9, 0.1)),

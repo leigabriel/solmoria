@@ -1,4 +1,5 @@
 import { audio } from '../audio/audio'
+import { input } from '../game/store'
 import { requestAttack, type AttackKind } from '../combat/state'
 
 const coarse = typeof matchMedia !== 'undefined' && matchMedia('(pointer: coarse)').matches
@@ -28,6 +29,16 @@ export function AttackButtons() {
           {b.label}
         </button>
       ))}
+      <button
+        className="atk b-jump"
+        onPointerDown={(e) => {
+          e.preventDefault()
+          audio.start()
+          input.jump = 0.15
+        }}
+      >
+        跳
+      </button>
     </div>
   )
 }
