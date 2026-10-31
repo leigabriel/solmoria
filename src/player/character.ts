@@ -19,6 +19,9 @@ export interface CharacterRig {
   capeBase: Float32Array
   capeHeight: number
   phase: number
+  katana: THREE.Group
+  tip: THREE.Object3D
+  guard: THREE.Object3D
 }
 
 const CAPE_W = 0.4
@@ -145,6 +148,43 @@ export function createCharacter(): CharacterRig {
   const aL = arm(-1)
   const aR = arm(1)
 
+  // ---- katana (blade +Y in its own space; rotated so it points forward from the fist) -------------
+  const katana = new THREE.Group()
+  const steel = new THREE.MeshLambertMaterial({ color: srgb(0.82, 0.86, 0.9), emissive: srgb(0.35, 0.33, 0.2), emissiveIntensity: 0.55 })
+  const edge = new THREE.MeshBasicMaterial({ color: srgb(1, 0.96, 0.78) })
+  const wrap = new THREE.MeshLambertMaterial({ color: srgb(0.12, 0.08, 0.1) })
+  const gold = new THREE.MeshLambertMaterial({ color: srgb(0.78, 0.6, 0.2), emissive: srgb(0.4, 0.28, 0.05), emissiveIntensity: 0.5 })
+  const bladeGeo = new THREE.BoxGeometry(0.02, 0.56, 0.05)
+  bladeGeo.translate(0, 0.28 + 0.06, 0)
+  const blade = new THREE.Mesh(bladeGeo, steel)
+  const tipGeo = new THREE.ConeGeometry(0.03, 0.07, 4).rotateY(Math.PI / 4).scale(0.5, 1, 1)
+  const tipMesh = new THREE.Mesh(tipGeo, steel)
+  tipMesh.position.y = 0.34 + 0.28 + 0.03
+  const edgeLine = new THREE.Mesh(new THREE.BoxGeometry(0.004, 0.56, 0.006).translate(0, 0.34, 0.016), edge)
+  const tsuba = new THREE.Mesh(new THREE.CylinderGeometry(0.036, 0.036, 0.009, 10), gold)
+  tsuba.position.y = 0.06
+  const grip = new THREE.Mesh(new THREE.CylinderGeometry(0.017, 0.017, 0.15, 7), wrap)
+  grip.position.y = -0.02
+  const pommel = new THREE.Mesh(new THREE.SphereGeometry(0.02, 6, 5), gold)
+  pommel.position.y = -0.1
+  katana.add(blade, tipMesh, edgeLine, tsuba, grip, pommel)
+  katana.traverse((o) => { o.castShadow = true })
+  const tip = new THREE.Object3D()
+  tip.position.y = 0.66
+  const guard = new THREE.Object3D()
+  guard.position.y = 0.1
+  katana.add(tip, guard)
+  katana.scale.setScalar(1.15)
+  katana.position.set(0, -0.245, 0.01)
+  katana.rotation.x = Math.PI / 2 + 0.25
+  aR.fore.add(katana)
+
+  // empty scabbard on the left hip
+  const saya = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.5, 0.04), wrap)
+  saya.position.set(-0.17, 0.0, -0.06)
+  saya.rotation.set(0.0, 0, 1.2)
+  hips.add(saya)
+
   // ---- flowing cape (vertex-animated every frame) -----------------------------------------------
   const capeGeo = new THREE.PlaneGeometry(CAPE_W, CAPE_H, CAPE_SEG_X, CAPE_SEG_Y)
   capeGeo.translate(0, -CAPE_H / 2, 0)
@@ -171,13 +211,66 @@ export function createCharacter(): CharacterRig {
     capeBase,
     capeHeight: CAPE_H,
     phase: 0,
+    katana,
+    tip,
+    guard,
   }
 }
 
 const clamp = THREE.MathUtils.clamp
 
 /** Idle / walk / run blended by speed, with cape physics-ish flutter. */
-export function animateCharacter(rig: CharacterRig, speed: number, dt: number, time: number) {
+export interface AttackPose {
+  kind: 'light' | 'heavy' | 'thrust' | 'spin'
+  step: number
+  u: number
+  hitFrom: number
+  hitTo: number
+}
+
+const sm = (a: number, b: number, x: number) => {
+  const t = clamp((x - a) / (b - a), 0, 1)
+  return t * t * (3 - 2 * t)
+}
+const lerp = THREE.MathUtils.lerp
+
+/** Overrides arm / torso pose for the active attack: windup, fast strike, recovery. */
+function attackPose(rig: CharacterRig, a: AttackPose) {
+  const w = sm(0, a.hitFrom, a.u) // windup
+  const e = 1 - Math.pow(1 - sm(a.hitFrom, a.hitTo, a.u), 3) // strike (ease-out)
+  const r = sm(a.hitTo, 1, a.u) // recover
+  const ar = rig.armR
+  const al = rig.armL
+  const fr = rig.foreR
+  const tor = rig.torso
+  let ax = 0, az = 0, ay = 0, ty = 0, tx = 0, by = 0, fb = 0
+  if (a.kind === 'light') {
+    if (a.step === 0) { // high right -> low left
+      ax = lerp(lerp(-0.3, -2.5, w), -1.0, e); az = lerp(lerp(-0.1, -0.9, w), 0.5, e); ty = lerp(lerp(0, -0.7, w), 0.8, e); fb = lerp(1.2, 0.2, e)
+    } else if (a.step === 1) { // backhand low left -> high right
+      ax = lerp(lerp(-0.3, -1.1, w), -1.7, e); az = lerp(lerp(-0.1, 0.7, w), -1.0, e); ty = lerp(lerp(0, 0.8, w), -0.8, e); fb = 0.3
+    } else { // rising finisher with a twist
+      ax = lerp(lerp(-0.3, -0.2, w), -2.7, e); az = lerp(lerp(-0.1, -0.5, w), -0.2, e); ty = lerp(lerp(0, -0.5, w), 0.6, e); tx = lerp(0, -0.25, e); fb = lerp(0.8, 0.1, e)
+    }
+  } else if (a.kind === 'heavy') {
+    ax = lerp(lerp(-0.3, -3.0, w), -0.55, e); az = -0.15; tx = lerp(lerp(0, -0.35, w), 0.55, e); fb = lerp(1.0, 0.1, e)
+    al.rotation.x = lerp(lerp(0, -2.7, w), -0.8, e)
+  } else if (a.kind === 'thrust') {
+    ax = lerp(lerp(-0.3, -1.1, w), -1.5, e); az = lerp(lerp(-0.1, -0.5, w), -0.05, e); ty = lerp(lerp(0, 0.7, w), -0.35, e); fb = lerp(1.1, 0.0, e)
+  } else {
+    ax = -1.45; az = -1.35 * Math.min(1, a.u * 6); by = sm(0, 0.95, a.u) * Math.PI * 2; ty = 0; fb = 0.1
+  }
+  const blend = a.kind === 'spin' ? 1 : 1 - r * 0.85
+  ar.rotation.x = lerp(ar.rotation.x, ax, blend)
+  ar.rotation.z = lerp(ar.rotation.z, az, blend)
+  ar.rotation.y = lerp(ar.rotation.y, ay, blend)
+  fr.rotation.x = lerp(fr.rotation.x, -fb, blend)
+  tor.rotation.y = lerp(tor.rotation.y, ty, blend)
+  tor.rotation.x = lerp(tor.rotation.x, tx, blend)
+  rig.body.rotation.y = by
+}
+
+export function animateCharacter(rig: CharacterRig, speed: number, dt: number, time: number, atk?: AttackPose | null) {
   const move = clamp(speed / 3.4, 0, 1)
   const run = clamp((speed - 2.2) / 3.4, 0, 1)
   const idle = 1 - move
@@ -216,6 +309,9 @@ export function animateCharacter(rig: CharacterRig, speed: number, dt: number, t
 
   // cape: trails behind with speed, ripples along its length
   const trail = clamp(speed / 5.6, 0, 1)
+  if (atk) attackPose(rig, atk)
+  else if (rig.body.rotation.y !== 0) rig.body.rotation.y = 0
+
   const pos = rig.cape.geometry.attributes.position as THREE.BufferAttribute
   const base = rig.capeBase
   const H = rig.capeHeight

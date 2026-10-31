@@ -7,6 +7,10 @@ import { Pollen } from '../atmosphere/Pollen'
 import { CameraRig } from '../player/CameraRig'
 import { NameTagDriver } from '../ui/NameTag'
 import { Player } from '../player/Player'
+import { Animals } from '../animals/Animals'
+import { AttackInput } from '../combat/AttackInput'
+import { CombatFX } from '../combat/CombatFX'
+import { AudioDriver } from '../audio/AudioDriver'
 import { World } from '../world/World'
 import { CAMERA, QUALITY, SKY_COLOR } from './config'
 import { AdaptiveRes } from './AdaptiveRes'
@@ -30,6 +34,10 @@ export function Game() {
       <Lighting />
       <World />
       <Player />
+      <Animals />
+      <AttackInput />
+      <CombatFX />
+      <AudioDriver />
       <CameraRig />
       <NameTagDriver />
       {q.godRays && <GodRays />}

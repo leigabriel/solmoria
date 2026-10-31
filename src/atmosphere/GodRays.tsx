@@ -6,7 +6,7 @@ import { playerState } from '../game/store'
 import { mulberry32 } from '../utils/random'
 import { makeBeamTexture } from '../utils/textures'
 
-const COUNT = 7
+const COUNT = 9
 
 /** A handful of long additive shafts aligned with the sun direction (cheap fake volumetric light). */
 export function GodRays() {
@@ -21,6 +21,7 @@ export function GodRays() {
       depthWrite: false,
       side: THREE.DoubleSide,
       opacity: 0.1,
+      color: 0xfff1c4,
       fog: false,
     })
     const quat = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), SUN_DIR.clone().negate())
@@ -41,7 +42,8 @@ export function GodRays() {
     const t = state.clock.elapsedTime
     g.children.forEach((shaft, i) => {
       const it = items[i]
-      const o = 0.025 + 0.035 * (0.5 + 0.5 * Math.sin(t * it.speed + it.phase))
+      const o = 0.03 + 0.05 * (0.5 + 0.5 * Math.sin(t * it.speed + it.phase)) * (0.6 + 0.4 * Math.sin(t * 0.13 + i))
+      shaft.position.x = it.x + Math.sin(t * 0.12 + it.phase) * 1.8
       for (const plane of shaft.children) ((plane as THREE.Mesh).material as THREE.MeshBasicMaterial).opacity = o
     })
   })

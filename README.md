@@ -49,3 +49,15 @@ public/models   Drop GLB characters / props here
 - Finite 512x512 world generated at startup from a hydrology simulation: rivers follow drainage, lakes sit in real basins, waterfalls form where rivers drop over the escarpment.
 - Ruins, cottages, stone circles, shrines and archways are placed on flattened dry ground; many are broken.
 - Chunks stream in staged steps with a per-frame time budget; props merge into one mesh per chunk; adaptive resolution targets 60 fps.
+
+## Controls
+| Input | Action |
+| --- | --- |
+| WASD / arrows, Shift | move, walk |
+| Left click / J | light slash, click again to chain a 3-hit combo |
+| Right click / K | heavy overhead slam |
+| Space / E | dash thrust |
+| Q / R | spin slash |
+| Touch | left thumb moves, right-side buttons attack |
+
+The blade swings toward the mouse pointer. Animals scatter when struck near or run at.

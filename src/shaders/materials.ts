@@ -213,7 +213,7 @@ if (vFlags.x > 0.5) {
 // ---------------------------------------------------------------------------------------------
 export function createWaterMaterial() {
   const m = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, depthWrite: false })
-  m.customProgramCacheKey = () => 'solmoria-water-1'
+  m.customProgramCacheKey = () => 'solmoria-water-3'
   m.onBeforeCompile = (shader) => {
     bind(shader)
     shader.vertexShader = shader.vertexShader
@@ -226,6 +226,7 @@ export function createWaterMaterial() {
         /* glsl */ `
 #include <color_fragment>
 {
+  if (vDepth <= 0.0) discard;
   float speed = length(vFlow);
   vec2 dir = speed > 0.01 ? vFlow / speed : uWindDir * 0.3;
   float sp = speed > 0.01 ? speed : 0.15;
@@ -249,17 +250,20 @@ export function createWaterMaterial() {
   col = mix(col, col * 1.28 + 0.05, smoothstep(0.54, 0.58, rip));
   col = mix(col, col * 0.84, smoothstep(0.40, 0.36, rip));
   // sun glints
-  float g = hash21(floor(vWXZ * 3.0) + floor(uTime * 1.5));
-  col += vec3(0.8, 0.9, 0.8) * step(0.992, g) * smoothstep(0.5, 0.6, rip);
+  vec2 gc = vWXZ * 2.2;
+  vec2 gid = floor(gc);
+  float g = hash21(gid + floor(uTime * 1.2));
+  float gd = length(fract(gc) - 0.5);
+  col += vec3(0.8, 0.9, 0.8) * step(0.985, g) * smoothstep(0.22, 0.0, gd) * smoothstep(0.5, 0.6, rip);
   // shoreline foam (stippled)
   float foamN = nR(uv * 11.0 + dir * uTime * 0.01);
-  float foam = smoothstep(0.30, 0.04, vDepth + (foamN - 0.5) * 0.25);
+  float foam = smoothstep(0.26, 0.05, vDepth + (foamN - 0.5) * 0.2) * smoothstep(0.0, 0.03, vDepth);
   col = mix(col, vec3(0.93, 0.98, 0.95), foam);
   // fast water is whiter
   col = mix(col, vec3(0.9, 0.97, 0.95), smoothstep(1.3, 2.4, speed) * smoothstep(0.5, 0.65, r1) * 0.7);
   col = toLinear(col);
   col *= 1.0 - 0.15 * cloudShadow(vWXZ);
-  float a = mix(0.0, 0.9, smoothstep(0.0, 0.3, vDepth));
+  float a = mix(0.35, 0.9, smoothstep(0.0, 0.3, vDepth));
   a = max(a, foam * 0.85);
   diffuseColor = vec4(col, a);
 }
@@ -274,7 +278,7 @@ export function createWaterMaterial() {
 // ---------------------------------------------------------------------------------------------
 export function createFallMaterial() {
   const m = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, depthWrite: false, side: THREE.DoubleSide })
-  m.customProgramCacheKey = () => 'solmoria-fall-1'
+  m.customProgramCacheKey = () => 'solmoria-fall-2'
   m.onBeforeCompile = (shader) => {
     bind(shader)
     shader.vertexShader = shader.vertexShader
@@ -289,15 +293,22 @@ export function createFallMaterial() {
 {
   float x = vFUv.x;
   float y = vFUv.y;
-  float s1 = nG(vec2(x * 1.6, y * 0.35 + uTime * 0.55));
-  float s2 = nR(vec2(x * 2.7 + 0.3, y * 0.22 + uTime * 0.85));
-  float streak = s1 * 0.55 + s2 * 0.45;
-  vec3 col = mix(vec3(0.55, 0.82, 0.86), vec3(0.97, 1.0, 1.0), smoothstep(0.42, 0.62, streak));
-  col = mix(col, vec3(0.38, 0.68, 0.78), smoothstep(0.38, 0.30, streak) * 0.7);
+  // fast vertical streaks that accelerate downward, plus a faster fine layer
+  float s1 = nG(vec2(x * 2.4 + 0.1, y * 0.18 + uTime * 0.9));
+  float s2 = nR(vec2(x * 4.1 + 0.3, y * 0.12 + uTime * 1.5));
+  float s3 = nA(vec2(x * 7.0, y * 0.3 + uTime * 2.2));
+  float streak = s1 * 0.45 + s2 * 0.35 + s3 * 0.2;
+  vec3 col = mix(vec3(0.62, 0.86, 0.90), vec3(0.98, 1.0, 1.0), smoothstep(0.40, 0.58, streak));
+  col = mix(col, vec3(0.40, 0.70, 0.80), smoothstep(0.34, 0.26, streak) * 0.6);
+  // frothy white at the lip and ragged side edges
+  float froth = smoothstep(1.2, 0.0, y) * 0.8;
+  col = mix(col, vec3(1.0), froth);
   col = toLinear(col);
-  float edge = smoothstep(0.0, 0.14, x) * smoothstep(1.0, 0.86, x);
-  float lip = smoothstep(0.0, 0.5, y);
-  diffuseColor = vec4(col, 0.9 * edge * lip);
+  float ragged = (nR(vec2(y * 0.5 + uTime * 0.6, x * 3.0)) - 0.5) * 0.18;
+  float edge = smoothstep(0.0, 0.12, x + ragged) * smoothstep(1.0, 0.88, x + ragged);
+  float lip = smoothstep(0.0, 0.25, y);
+  float a0 = mix(0.62, 0.95, smoothstep(0.38, 0.55, streak));
+  diffuseColor = vec4(col, a0 * edge * lip);
 }
 `,
       )

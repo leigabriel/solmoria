@@ -147,17 +147,40 @@ function waterMesh(cx: number, cz: number) {
   const pos = new Float32Array(n1 * n1 * 3)
   const dep = new Float32Array(n1 * n1)
   const flow = new Float32Array(n1 * n1 * 2)
+  // Dry vertices borrow the nearest water level so signed depth crosses zero exactly at the shoreline.
   for (let j = 0; j <= N; j++) {
     for (let i = 0; i <= N; i++) {
-      const c = (oz + j) * VERTS + ox + i
+      const gx = ox + i
+      const gz = oz + j
+      const c = gz * VERTS + gx
       const k = j * n1 + i
-      const d = world.depth[c]
-      pos[k * 3] = ox + i - WORLD_HALF
-      pos[k * 3 + 1] = (world.wl[c] > NO_WATER / 2 ? Math.max(world.wl[c], world.h[c]) : world.h[c]) + 0.02
-      pos[k * 3 + 2] = oz + j - WORLD_HALF
+      let lvl = world.wl[c]
+      let fx = world.flowX[c]
+      let fz = world.flowZ[c]
+      if (!(lvl > NO_WATER / 2) || world.depth[c] <= 0) {
+        lvl = NO_WATER
+        for (let dz = -2; dz <= 2; dz++) {
+          for (let dx = -2; dx <= 2; dx++) {
+            const x = gx + dx
+            const z = gz + dz
+            if (x < 0 || z < 0 || x >= VERTS || z >= VERTS) continue
+            const cc = z * VERTS + x
+            if (world.depth[cc] > 0 && world.wl[cc] > lvl) {
+              lvl = world.wl[cc]
+              fx = world.flowX[cc]
+              fz = world.flowZ[cc]
+            }
+          }
+        }
+      }
+      const hh = world.h[c]
+      const d = lvl > NO_WATER / 2 ? Math.max(-1, lvl - hh) : -1
+      pos[k * 3] = gx - WORLD_HALF
+      pos[k * 3 + 1] = lvl > NO_WATER / 2 ? lvl : hh - 0.5
+      pos[k * 3 + 2] = gz - WORLD_HALF
       dep[k] = d
-      flow[k * 2] = world.flowX[c]
-      flow[k * 2 + 1] = world.flowZ[c]
+      flow[k * 2] = fx
+      flow[k * 2 + 1] = fz
     }
   }
   const idx: number[] = []
@@ -167,7 +190,7 @@ function waterMesh(cx: number, cz: number) {
       const b = a + 1
       const c = a + n1
       const d = c + 1
-      if (dep[a] > 0.01 || dep[b] > 0.01 || dep[c] > 0.01 || dep[d] > 0.01) idx.push(a, c, b, b, c, d)
+      if (dep[a] > 0 || dep[b] > 0 || dep[c] > 0 || dep[d] > 0) idx.push(a, c, b, b, c, d)
     }
   }
   const g = new THREE.BufferGeometry()

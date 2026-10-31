@@ -28,8 +28,9 @@ export function makeBeamTexture() {
     for (let x = 0; x < w; x++) {
       const u = (x / (w - 1)) * 2 - 1
       const v = y / (h - 1)
-      const across = Math.pow(1 - Math.abs(u), 2)
-      const along = Math.sin(v * Math.PI)
+      const stripes = 0.65 + 0.35 * Math.sin(u * 9.0 + Math.sin(u * 3.0) * 2.0)
+      const across = Math.exp(-u * u * 4.5) * stripes
+      const along = Math.pow(Math.sin(Math.pow(v, 0.8) * Math.PI), 1.4)
       const a = across * along
       const i = (y * w + x) * 4
       img.data[i] = 255

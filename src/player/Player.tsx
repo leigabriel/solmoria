@@ -7,7 +7,12 @@ import { readMove } from '../input/useKeyboard'
 import { sharedUniforms } from '../shaders/materials'
 import { depthAt, heightAt, WORLD_HALF, world } from '../world/terrainData'
 import { resolveCollisions } from '../world/scatter'
-import { animateCharacter, createCharacter, disposeCharacter } from './character'
+import { audio } from '../audio/audio'
+import { combat, tickCombat } from '../combat/state'
+import { animateCharacter, createCharacter, disposeCharacter, type CharacterRig } from './character'
+
+/** Live handle for effects that attach to the character (slash trail, sparks). */
+export const playerRig: { current: CharacterRig | null } = { current: null }
 
 const mv = { x: 0, y: 0, walk: false }
 const damp = THREE.MathUtils.damp
@@ -21,15 +26,20 @@ export function Player() {
   const rig = useMemo(() => createCharacter(), [])
 
   useEffect(() => {
+    playerRig.current = rig
     playerState.pos.set(world.spawn.x, heightAt(world.spawn.x, world.spawn.z), world.spawn.z)
     playerState.vel.set(0, 0, 0)
     playerState.speed = 0
     playerState.facing = Math.PI * 0.1
-    return () => disposeCharacter(rig)
+    return () => {
+      playerRig.current = null
+      disposeCharacter(rig)
+    }
   }, [rig])
 
   useFrame((state, rawDt) => {
     const dt = Math.min(rawDt, 0.05)
+    tickCombat(dt)
     readMove(mv)
     const mag = Math.min(1, Math.hypot(mv.x, mv.y))
 
@@ -42,8 +52,26 @@ export function Player() {
     const dirZ = mag > 0.001 ? -mv.y / mag : 0
 
     const { pos, vel } = playerState
-    vel.x = damp(vel.x, dirX * target, PLAYER.accel, dt)
-    vel.z = damp(vel.z, dirZ * target, PLAYER.accel, dt)
+    const attacking = combat.active
+    if (attacking && combat.t < 0.02) {
+      // snap toward the aim (pointer) or, failing that, the held direction
+      if (combat.hasAim) playerState.facing = combat.aim
+      else if (mag > 0.1) playerState.facing = Math.atan2(dirX, dirZ)
+    }
+    let tvx = dirX * target
+    let tvz = dirZ * target
+    if (attacking) {
+      const u = combat.u
+      const striking = u >= combat.def.hitFrom * 0.6 && u <= combat.def.hitTo
+      tvx *= combat.def.move
+      tvz *= combat.def.move
+      if (striking) {
+        tvx += Math.sin(playerState.facing) * combat.def.lunge
+        tvz += Math.cos(playerState.facing) * combat.def.lunge
+      }
+    }
+    vel.x = damp(vel.x, tvx, attacking ? 22 : PLAYER.accel, dt)
+    vel.z = damp(vel.z, tvz, attacking ? 22 : PLAYER.accel, dt)
 
     // deep water blocks movement, shallows slow you down
     const d0 = depthAt(pos.x, pos.z)
@@ -64,13 +92,23 @@ export function Player() {
 
     const speed = Math.hypot(vel.x, vel.z)
     playerState.speed = speed
-    if (speed > 0.25) {
+    if (speed > 0.25 && !attacking) {
       playerState.facing = lerpAngle(playerState.facing, Math.atan2(vel.x, vel.z), 1 - Math.exp(-PLAYER.turnRate * dt))
     }
 
     rig.root.position.copy(pos)
     rig.root.rotation.y = playerState.facing
-    animateCharacter(rig, speed, dt, state.clock.elapsedTime)
+    const prevPhase = Math.floor(rig.phase / Math.PI)
+    animateCharacter(
+      rig,
+      attacking ? Math.min(speed, 1.2) : speed,
+      dt,
+      state.clock.elapsedTime,
+      attacking ? { kind: combat.kind!, step: combat.step, u: combat.u, hitFrom: combat.def.hitFrom, hitTo: combat.def.hitTo } : null,
+    )
+    if (speed > 0.9 && !attacking && Math.floor(rig.phase / Math.PI) !== prevPhase) {
+      audio.step(depthAt(pos.x, pos.z) > 0.06 ? 'water' : 'grass', speed > 3.6)
+    }
     sharedUniforms.uPlayer.value.copy(pos)
   })
 

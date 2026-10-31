@@ -428,11 +428,74 @@ export function generateWorld(seed: number): WorldData {
     const cells = up >= 0 ? [up, ...chain] : chain
     const last = parent[cells[cells.length - 1]]
     if (last >= 0 && isRiver[last]) cells.push(last)
-    const pts: number[] = []
-    for (const s of cells) {
-      pts.push((s % VERTS) - H, bedOf(s) + depthOf(s) * 0.88 + 0.3, ((s / VERTS) | 0) - H)
+    // lip = biggest single drop along the run; sculpt a real cliff there
+    let m = 0
+    let best = -1
+    for (let i = 0; i < cells.length - 1; i++) {
+      const dd = bedOf(cells[i]) - bedOf(cells[i + 1])
+      if (dd > best) {
+        best = dd
+        m = i
+      }
     }
-    falls.push({ pts, width: widthOf(c), drop, baseY: bedOf(chain[chain.length - 1]) })
+    const lipC = cells[m]
+    const lastC = cells[cells.length - 1]
+    const lx = lipC % VERTS
+    const lz = (lipC / VERTS) | 0
+    let dxl = (lastC % VERTS) - lx
+    let dzl = ((lastC / VERTS) | 0) - lz
+    const dl = Math.hypot(dxl, dzl) || 1
+    dxl /= dl
+    dzl /= dl
+    const lipBed = bedOf(lipC)
+    const baseBed = bedOf(lastC)
+    const hw = widthOf(c) / 2
+    const dep = depthOf(lastC)
+    const lipW = lipBed + depthOf(lipC) * 0.88
+    const baseW = baseBed + dep * 0.88
+    const FACE = 1.6
+    const poolEnd = FACE + hw * 1.6
+    const R = Math.ceil(hw + 7 + poolEnd)
+    for (let dz = -R; dz <= R; dz++) {
+      const nz = lz + dz
+      if (nz < 0 || nz >= VERTS) continue
+      for (let dx = -R; dx <= R; dx++) {
+        const nx = lx + dx
+        if (nx < 0 || nx >= VERTS) continue
+        const u = dx * dxl + dz * dzl
+        const sd = Math.abs(dx * dzl - dz * dxl)
+        if (u < 0 || u > poolEnd + 2 || sd > hw + 6) continue
+        const n = nz * VERTS + nx
+        const k = Math.min(1, u / FACE)
+        const sm = k * k * (3 - 2 * k)
+        let prof = lipBed + (baseBed - lipBed) * sm
+        const inPool = u > FACE - 0.4 && u < poolEnd
+        if (inPool && sd <= hw) prof = baseBed - 0.55 * Math.sin(Math.PI * Math.min(1, (u - FACE + 0.4) / (poolEnd - FACE + 0.4)))
+        const target = prof + Math.max(0, sd - hw) * 0.55
+        if (target < h[n]) h[n] = target
+        if (sd <= hw + 1.5 && u > 0.05) {
+          if (u < FACE - 0.4) riverWl[n] = NO_WATER
+          else if (u < poolEnd + 1) {
+            riverWl[n] = baseW
+            flowX[n] = dxl * 0.4
+            flowZ[n] = dzl * 0.4
+          }
+        }
+      }
+    }
+    // curtain follows the cliff face, slightly proud of it, leaving the lip in a small arc
+    const pts: number[] = []
+    const STEPS = 12
+    for (let i = 0; i <= STEPS; i++) {
+      const t = i / STEPS
+      let k = 0.5
+      for (let it = 0; it < 12; it++) k -= (k * k * (3 - 2 * k) - t) / Math.max(0.2, 6 * k * (1 - k))
+      k = Math.min(1, Math.max(0, k))
+      const uu = k * FACE + 0.22 + 0.25 * Math.sin(Math.PI * t) * (1 - t)
+      const y = lipW + (baseW - lipW) * t
+      pts.push(lx - H + dxl * uu, y, lz - H + dzl * uu)
+    }
+    falls.push({ pts, width: widthOf(c) * 0.9, drop: lipBed - baseBed, baseY: baseW })
   }
 
   // ---------------------------------------------------------------- 7. combine water (lakes > rivers > sea)
@@ -478,6 +541,19 @@ export function generateWorld(seed: number): WorldData {
   }
   const shore = new Float32Array(total)
   for (let c = 0; c < total; c++) shore[c] = clamp(1 - dist[c] / 4.5, 0, 1)
+  // soften the chamfer-distance staircase
+  for (let pass = 0; pass < 2; pass++) {
+    const src = shore.slice()
+    for (let z = 1; z < VERTS - 1; z++) {
+      for (let x = 1; x < VERTS - 1; x++) {
+        const c = z * VERTS + x
+        if (depth[c] > 0.03) continue
+        let sum = 0
+        for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) sum += src[c + dz * VERTS + dx]
+        shore[c] = sum / 9
+      }
+    }
+  }
 
   // ---------------------------------------------------------------- 8. structure sites (dry, gentle ground) + spawn
   const bil = (arr: Float32Array, x: number, z: number) => {

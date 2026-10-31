@@ -3,6 +3,7 @@ import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { CAMERA } from '../game/config'
 import { playerState } from '../game/store'
+import { combat } from '../combat/state'
 
 const pitch = THREE.MathUtils.degToRad(CAMERA.pitchDeg)
 const OFFSET_Y = Math.sin(pitch) * CAMERA.distance
@@ -29,6 +30,11 @@ export function CameraRig() {
       f.z = THREE.MathUtils.damp(f.z, tz, CAMERA.damp, dt)
     }
     camera.position.set(f.x, f.y + OFFSET_Y, f.z + OFFSET_Z)
+    if (combat.shake > 0) {
+      const k = combat.shake * combat.shake * 0.35
+      camera.position.x += (Math.random() - 0.5) * k
+      camera.position.y += (Math.random() - 0.5) * k
+    }
     camera.lookAt(f)
   })
 
