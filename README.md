@@ -94,3 +94,22 @@ Ten biomes are laid out by `src/world/biomeGen.ts` (warped nearest-anchor map, t
 Each biome sets its own ground palette (blended softly in the terrain shader from a coarse biome texture), grass colour and density, props, sky / fog / light colours, floating particles, wind and bird ambience, and footstep sound. Lava is solid: the player cannot walk into it. The biome name appears briefly when you enter a new one, and the map legend lists them all.
 
 The cavern is an open-roof sunken bowl: the terrain is a heightfield, so it cannot hold a true ceiling under the high camera.
+
+## Villages and the spawn camp
+
+There are eight villages, one per biome, each with its own look (`src/world/structures.ts`):
+
+| Biome | Houses | Plaza | Wall |
+| --- | --- | --- | --- |
+| Grassland | thatch cottages, mushroom houses, towers, hobbit holes, windmill | well | picket fence |
+| Forest | log cabins | bonfire | log palisade |
+| Desert | adobe houses with awnings | oasis with palms | sandstone wall with domed towers |
+| Snow | A-frame cabins and igloos | bonfire | snow-capped stone wall |
+| Tropical | stilt huts | totem | bamboo fence |
+| Swamp | stilt shacks | mossy well | reed fence |
+| Mountain | stone chalets, watchtower | obelisk | tall stone wall |
+| Enchanted | crystal mushroom houses and spires | crystal fountain | glowing hedge |
+
+Walls are built from short segments that follow the ground, with three gates (posts, lintel and lantern) and a road out of each one. Villagers keep to a post, only choose spots they can stand on, and turn to face you when you come close.
+
+The hero starts at the camp near the centre of the map: a canvas tent, a fire ring with animated flames and light, log seats, a statue of the hero holding a glowing shard, lantern posts and a signpost. It is marked on both maps.

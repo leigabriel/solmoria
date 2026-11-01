@@ -2,7 +2,7 @@ import { BIOMES } from '../world/biomes'
 import { useEffect, useRef, useState } from 'react'
 import { playerState, useHud } from '../game/store'
 import { WORLD_HALF, world } from '../world/terrainData'
-import { villages } from '../world/villages'
+import { camp, villages } from '../world/villages'
 import { worldImage } from './Minimap'
 
 const WORLD = WORLD_HALF * 2
@@ -76,6 +76,27 @@ function MapView() {
         g.strokeText(vl.name, x, y - 11)
         g.fillStyle = '#fff6d8'
         g.fillText(vl.name, x, y - 11)
+      }
+      // the spawn camp
+      if (camp) {
+        const [x, y] = toScreen(camp.x, camp.z)
+        g.fillStyle = '#ffd24a'
+        g.strokeStyle = '#3a2412'
+        g.lineWidth = 2
+        g.beginPath()
+        for (let k = 0; k < 10; k++) {
+          const r = k % 2 ? 4 : 9
+          const a = (k / 10) * Math.PI * 2 - Math.PI / 2
+          g.lineTo(x + Math.cos(a) * r, y + Math.sin(a) * r)
+        }
+        g.closePath()
+        g.fill()
+        g.stroke()
+        g.lineWidth = 3
+        g.strokeStyle = 'rgba(40,24,10,0.85)'
+        g.strokeText('Camp', x, y - 13)
+        g.fillStyle = '#fff6d8'
+        g.fillText('Camp', x, y - 13)
       }
       // you
       const [px, py] = toScreen(playerState.pos.x, playerState.pos.z)
@@ -164,6 +185,7 @@ function MapView() {
         <canvas ref={ref} style={{ width: size, height: size }} />
         <div className="map-key">
           <span style={{ ['--c' as string]: '#fff6d0' }}>You</span>
+          <span style={{ ['--c' as string]: '#ffd24a' }}>Camp</span>
           <span style={{ ['--c' as string]: '#c0562f' }}>Village</span>
           <span style={{ ['--c' as string]: '#ffffff' }}>Waterfall</span>
           <span style={{ ['--c' as string]: '#4a3b2a' }}>Ruins</span>

@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react'
 import { playerState } from '../game/store'
 import { useHud } from '../game/store'
 import { SEA_LEVEL, VERTS, WORLD_HALF, world } from '../world/terrainData'
-import { villages } from '../world/villages'
+import { camp, villages } from '../world/villages'
 import { BIOMES } from '../world/biomes'
 
 const SIZE = 150
@@ -64,6 +64,16 @@ export function worldImage() {
     g.fillStyle = '#c0562f'
     g.beginPath()
     g.arc(v.site.x + WORLD_HALF, v.site.z + WORLD_HALF, 2.8, 0, Math.PI * 2)
+    g.fill()
+  }
+  if (camp) {
+    g.fillStyle = '#3a2412'
+    g.beginPath()
+    g.arc(camp.x + WORLD_HALF, camp.z + WORLD_HALF, 4.6, 0, Math.PI * 2)
+    g.fill()
+    g.fillStyle = '#ffd24a'
+    g.beginPath()
+    g.arc(camp.x + WORLD_HALF, camp.z + WORLD_HALF, 3.1, 0, Math.PI * 2)
     g.fill()
   }
   g.fillStyle = '#ffffff'

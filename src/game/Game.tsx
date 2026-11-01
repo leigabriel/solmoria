@@ -7,6 +7,7 @@ import { Lighting } from '../atmosphere/Lighting'
 import { Pollen } from '../atmosphere/Pollen'
 import { CameraRig } from '../player/CameraRig'
 import { NameTagDriver } from '../ui/NameTag'
+import { CampFire } from '../world/CampFire'
 import { Player } from '../player/Player'
 import { SwimFX } from '../player/SwimFX'
 import { NpcBubbleDriver } from '../ui/NpcBubble'
@@ -37,6 +38,7 @@ export function Game() {
       <BiomeAtmosphere />
       <Lighting />
       <World />
+      <CampFire />
       <Player />
       <SwimFX />
       <Animals />

@@ -61,9 +61,9 @@ export function nearestNpc(x: number, z: number, r: number) {
 
 function villagerOk(a: Animal, x: number, z: number) {
   const site = a.home!
-  if (Math.hypot(x - site.x, z - site.z) > 17.5) return false
+  if (Math.hypot(x - site.x, z - site.z) > 17.2) return false
   if (depthAt(x, z) > 0.04 || slopeAt(x, z) > 0.7 || badGround(x, z)) return false
-  for (const c of siteGeometry(site).cols) if (Math.hypot(c.x - x, c.z - z) < c.r + 0.4) return false
+  for (const c of siteGeometry(site).cols) if (Math.hypot(c.x - x, c.z - z) < c.r + 0.45) return false
   return true
 }
 
@@ -143,7 +143,7 @@ function populate() {
         const r = 2 + rng() * 13
         const x = site.x + Math.cos(a) * r
         const z = site.z + Math.sin(a) * r
-        const probe: Animal = { sp: mix[k % mix.length], i: 0, x, z, hx: site.x, hz: site.z, yaw: rng() * 6.28, tx: x, tz: z, mode: 0, timer: rng() * 4, gait: 0, speed: 0, voice: 99, hop: rng() * 6, home: site }
+        const probe: Animal = { sp: mix[k % mix.length], i: 0, x, z, hx: x, hz: z, yaw: rng() * 6.28, tx: x, tz: z, mode: 0, timer: rng() * 4, gait: 0, speed: 0, voice: 99, hop: rng() * 6, home: site }
         if (villagerOk(probe, x, z)) {
           counts[probe.sp.id] = (counts[probe.sp.id] ?? 0) + 1
           probe.name = NPC_NAMES[Math.floor(rng() * NPC_NAMES.length)]
@@ -158,7 +158,7 @@ function populate() {
       const r = 3 + rng() * 11
       const x = site.x + Math.cos(a) * r
       const z = site.z + Math.sin(a) * r
-      const probe: Animal = { sp: sp.chicken, i: 0, x, z, hx: site.x, hz: site.z, yaw: rng() * 6.28, tx: x, tz: z, mode: 0, timer: rng() * 4, gait: 0, speed: 0, voice: 8 + rng() * 30, hop: rng() * 6, home: site }
+      const probe: Animal = { sp: sp.chicken, i: 0, x, z, hx: x, hz: z, yaw: rng() * 6.28, tx: x, tz: z, mode: 0, timer: rng() * 4, gait: 0, speed: 0, voice: 8 + rng() * 30, hop: rng() * 6, home: site }
       if (villagerOk(probe, x, z)) {
         counts.chicken = (counts.chicken ?? 0) + 1
         animals.push(probe)
@@ -233,7 +233,7 @@ function Ground() {
       const s = a.sp
       const dp = Math.hypot(a.x - px, a.z - pz)
       // spook when the player runs straight at them
-      if (a.mode !== 2 && dp < 3.2 && playerState.speed > 3.5) {
+      if (a.mode !== 2 && dp < 3.2 && playerState.speed > 3.5 && !s.npc) {
         a.mode = 2
         a.timer = 1.5 + Math.random()
         a.tx = a.x + ((a.x - px) / (dp || 1)) * 14
@@ -247,10 +247,23 @@ function Ground() {
         } else if (Math.random() < 0.7) {
           a.mode = 1
           a.timer = 6
-          const ang = Math.random() * 6.28
-          const r = Math.random() * s.home
+          let ang = Math.random() * 6.28
+          let r = Math.random() * s.home
           a.tx = a.hx + Math.cos(ang) * r
           a.tz = a.hz + Math.sin(ang) * r
+          // villagers only pick spots they can actually stand on (not inside a house, fence or pond)
+          if (a.home) {
+            for (let k = 0; k < 8 && !villagerOk(a, a.tx, a.tz); k++) {
+              ang = Math.random() * 6.28
+              r = Math.random() * s.home
+              a.tx = a.hx + Math.cos(ang) * r
+              a.tz = a.hz + Math.sin(ang) * r
+            }
+            if (!villagerOk(a, a.tx, a.tz)) {
+              a.mode = 0
+              a.timer = 1.5
+            }
+          }
         } else a.timer = 2 + Math.random() * 5
       }
       let want = 0
@@ -268,6 +281,14 @@ function Ground() {
           const d = Math.atan2(Math.sin(ty - a.yaw), Math.cos(ty - a.yaw))
           a.yaw += d * Math.min(1, dt * (a.mode === 2 ? 8 : 3))
         }
+      }
+      // villagers stop and turn to face a nearby hero (so the dialogue bubble feels like a conversation)
+      if (a.home && s.npc && dp < 4.4 && a.mode !== 2) {
+        a.mode = 0
+        a.timer = Math.max(a.timer, 0.6)
+        want = 0
+        const ty = Math.atan2(px - a.x, pz - a.z)
+        a.yaw += Math.atan2(Math.sin(ty - a.yaw), Math.cos(ty - a.yaw)) * Math.min(1, dt * 4)
       }
       a.speed += (want - a.speed) * Math.min(1, dt * 4)
       if (a.speed > 0.02) {

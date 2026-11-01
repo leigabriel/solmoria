@@ -22,7 +22,7 @@ export const VERTS = GRID + 1
 export const SEA_LEVEL = -0.4
 export const NO_WATER = -1e9
 
-export type SiteType = 'ruinCourt' | 'cottage' | 'cottageRuin' | 'stoneCircle' | 'shrine' | 'archway' | 'village'
+export type SiteType = 'ruinCourt' | 'cottage' | 'cottageRuin' | 'stoneCircle' | 'shrine' | 'archway' | 'village' | 'camp'
 
 export interface Site {
   x: number
@@ -99,6 +99,7 @@ const SITE_RADIUS: Record<SiteType, number> = {
   shrine: 5,
   archway: 5,
   village: 19,
+  camp: 8,
 }
 
 export function generateWorld(seed: number): WorldData {
@@ -605,7 +606,17 @@ export function generateWorld(seed: number): WorldData {
   const TYPES: SiteType[] = ['ruinCourt', 'cottage', 'cottageRuin', 'stoneCircle', 'shrine', 'archway', 'ruinCourt', 'cottageRuin', 'stoneCircle']
   const addSite = (x: number, z: number, type: SiteType, sd: number) => {
     const r = SITE_RADIUS[type]
-    const y = bil(h, x, z)
+    let y = bil(h, x, z)
+    // never level a pad below the local water table (swamp ponds): raise it just above the highest water inside
+    for (let dz = -r; dz <= r; dz += 2) {
+      for (let dx = -r; dx <= r; dx += 2) {
+        const ix = Math.round(x + dx) + H
+        const iz = Math.round(z + dz) + H
+        if (ix < 0 || iz < 0 || ix >= VERTS || iz >= VERTS || dx * dx + dz * dz > r * r) continue
+        const wv = wl[iz * VERTS + ix]
+        if (wv > NO_WATER / 2 && wv > SEA_LEVEL + 0.05) y = Math.max(y, wv + 0.3)
+      }
+    }
     // flatten a pad so walls and floors sit on level ground
     const R = r + 5
     for (let dz = -R; dz <= R; dz++) {
@@ -618,38 +629,49 @@ export function generateWorld(seed: number): WorldData {
         const t = smooth(R, r, d)
         const c = iz * VERTS + ix
         h[c] = h[c] * (1 - t) + y * t
+        // levelled ground can drown or dry out water cells: keep the depth field in step with the new height
+        if (wl[c] > NO_WATER / 2) depth[c] = Math.max(0, wl[c] - h[c])
       }
     }
     sites.push({ x, z, y, type, seed: sd, radius: r })
   }
-  const villageOk = (x: number, z: number) => {
+  const villageOk = (x: number, z: number, ignoreWater = false) => {
     if (Math.abs(x) > H - 50 || Math.abs(z) > H - 50) return false
     for (const [ox, oz] of [[0, 0], [24, 0], [-24, 0], [0, 24], [0, -24]]) if (badBiome(x + ox, z + oz)) return false
     const h0 = bil(h, x, z)
-    if (h0 < SEA_LEVEL + 1.5 || h0 > 16) return false
+    if (h0 < SEA_LEVEL + 0.6 || h0 > 26) return false
     for (const rr of [0, 6, 12, 18, 24]) {
       for (let k = 0; k < (rr === 0 ? 1 : 12); k++) {
         const a = (k / 12) * Math.PI * 2
         const px = x + Math.cos(a) * rr
         const pz = z + Math.sin(a) * rr
-        if (rr <= 18 && bil(depth, px, pz) > 0) return false
-        if (rr <= 12 && bil(shore, px, pz) > 0.001) return false
-        if (Math.abs(bil(h, px, pz) - h0) > (rr <= 12 ? 2.8 : 6)) return false
+        if (!ignoreWater && rr <= 16 && bil(depth, px, pz) > 0) return false
+        if (!ignoreWater && rr <= 10 && bil(shore, px, pz) > 0.001) return false
+        if (Math.abs(bil(h, px, pz) - h0) > (rr <= 12 ? 3.6 : 7)) return false
       }
     }
     return sites.every((s) => Math.hypot(s.x - x, s.z - z) > s.radius + SITE_RADIUS.village + 14)
   }
-  // villages first (they need the most flat ground), spread across the map
-  const VILLAGE_ANCHORS: [number, number][] = [[54, 24], [-64, -30], [-84, 72], [106, 56], [-134, -84], [150, -72], [24, 132], [-20, -120]]
-  for (const [ax, az] of VILLAGE_ANCHORS) {
+  // villages first (they need the most flat ground): one per biome, each with its own style. The search
+  // spirals out from the anchor and only accepts ground inside the requested biome.
+  const VILLAGE_ANCHORS: [number, number, number][] = [
+    [54, 24, B.Grass], [-100, -30, B.Forest], [175, 75, B.Desert], [60, -190, B.Snow], [-60, -185, B.Snow], [0, -150, B.Snow], [-190, -140, B.Snow], [-150, -190, B.Snow],
+    [-95, 195, B.Tropical], [100, 160, B.Swamp], [-215, 10, B.Mountain], [-130, 5, B.Magical],
+  ]
+  const biomeHere = (x: number, z: number) => biome[clamp(Math.round(z) + H, 0, VERTS - 1) * VERTS + clamp(Math.round(x) + H, 0, VERTS - 1)]
+  const placedBiomes = new Set<number>()
+  for (const [ax, az, want] of VILLAGE_ANCHORS) {
+    if (placedBiomes.has(want)) continue
     let done = false
-    for (let rad = 0; rad <= 130 && !done; rad += 4) {
-      for (let k = 0; k < (rad === 0 ? 1 : 20) && !done; k++) {
-        const a = (k / 20) * Math.PI * 2
+    for (let rad = 0; rad <= 150 && !done; rad += 4) {
+      for (let k = 0; k < (rad === 0 ? 1 : 24) && !done; k++) {
+        const a = (k / 24) * Math.PI * 2
         const x = Math.round(ax + Math.cos(a) * rad)
         const z = Math.round(az + Math.sin(a) * rad)
-        if (villageOk(x, z)) {
+        if (biomeHere(x, z) !== want || biomeHere(x + 8, z) !== want || biomeHere(x - 8, z) !== want || biomeHere(x, z + 8) !== want || biomeHere(x, z - 8) !== want) continue
+        if (villageOk(x, z, want === B.Swamp)) {
           addSite(x, z, 'village', hashInts(x, z, seed, 77))
+          placedBiomes.add(want)
           done = true
         }
       }
@@ -694,11 +716,14 @@ export function generateWorld(seed: number): WorldData {
       if (bil(shore, x, z) > 0.001 || bil(depth, x, z) > 0) continue
       const h0 = bil(h, x, z)
       if (Math.abs(bil(h, x + 3, z) - h0) > 0.5 || Math.abs(bil(h, x, z + 3) - h0) > 0.5) continue
-      if (sites.some((s) => Math.hypot(s.x - x, s.z - z) < s.radius + 6)) continue
+      if (sites.some((s) => Math.hypot(s.x - x, s.z - z) < s.radius + 11)) continue
       spawn = { x, z }
       break search
     }
   }
+  // the camp: tent, fire and statue at the spawn point. The hero starts a few steps in front of it.
+  addSite(spawn.x, spawn.z, 'camp', hashInts(spawn.x, spawn.z, seed, 31))
+  spawn = { x: spawn.x + 1.5, z: spawn.z + 6.5 }
 
   return {
     h,
