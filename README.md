@@ -64,3 +64,24 @@ The blade swings toward the mouse pointer. Animals scatter when struck near or r
 
 ## Villages and villagers
 Eight villages are placed on flat dry ground across the map (plaza, well, market stalls, windmill, mushroom houses, thatched cottages, tower houses, hobbit holes). Farmers, elders, merchants, children and guards wander inside them; walk up to one to see a line of dialogue. Press `M` for the world map, `Space` to jump.
+
+## Biomes
+
+Ten biomes are laid out by `src/world/biomeGen.ts` (warped nearest-anchor map, then terrain shaping) and described by data in `src/world/biomes.ts`:
+
+| Biome | Where | Notes |
+| --- | --- | --- |
+| Grassland | around the spawn | meadows, flowers, mixed trees |
+| Forest | west / north-east | dense mixed woodland |
+| Desert | east | dunes, cacti, sandstone, dry shrubs |
+| Snow | north | snow pines, frost shrubs, falling snow |
+| Tropical | south | palms, mangroves, lush ferns, bright flowers |
+| Swamp | south-west / south-east | flattened ground, little ponds, willows, fireflies |
+| Volcanic | north-east | volcano cone with a lava crater, lava streams and pools, charred trees, embers |
+| Mountain | west rim and high ground | ridged peaks with snow caps |
+| Cavern | two sunken caves in the north | open-roof bowl with a ramp, glowing mushrooms and crystals |
+| Enchanted | west | glowing trees, crystals, sparkles |
+
+Each biome sets its own ground palette (blended softly in the terrain shader from a coarse biome texture), grass colour and density, props, sky / fog / light colours, floating particles, wind and bird ambience, and footstep sound. Lava is solid: the player cannot walk into it. The biome name appears briefly when you enter a new one, and the map legend lists them all.
+
+The cavern is an open-roof sunken bowl: the terrain is a heightfield, so it cannot hold a true ceiling under the high camera.

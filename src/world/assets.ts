@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { createFallMaterial, createGrassMaterial, createMistMaterial, createPropMaterial, createTerrainMaterial, createWaterMaterial } from '../shaders/materials'
+import { BIOME_CELL, sharedUniforms, createFallMaterial, createLavaMaterial, createGrassMaterial, createMistMaterial, createPropMaterial, createTerrainMaterial, createWaterMaterial } from '../shaders/materials'
 
 /**
  * Grass tuft of 9 single-triangle spikes fanned like the glyphs "\ | /": left-leaning, upright and
@@ -35,11 +35,36 @@ function spikeClump() {
   return g
 }
 
+import { world } from './terrainData'
+import { VERTS, WORLD_HALF } from './hydrology'
+
+/** coarse biome-id texture: one texel per BIOME_CELL x BIOME_CELL world units, sampled at the cell centre */
+function buildBiomeTexture() {
+  const N = Math.ceil((WORLD_HALF * 2) / BIOME_CELL)
+  const data = new Uint8Array(N * N)
+  for (let z = 0; z < N; z++) {
+    for (let x = 0; x < N; x++) {
+      const ix = Math.min(VERTS - 1, x * BIOME_CELL + BIOME_CELL / 2)
+      const iz = Math.min(VERTS - 1, z * BIOME_CELL + BIOME_CELL / 2)
+      data[z * N + x] = world.biome[iz * VERTS + ix]
+    }
+  }
+  const tex = new THREE.DataTexture(data, N, N, THREE.RedFormat)
+  tex.minFilter = THREE.NearestFilter
+  tex.magFilter = THREE.NearestFilter
+  tex.unpackAlignment = 1
+  tex.needsUpdate = true
+  sharedUniforms.uBiomeTex.value = tex
+  sharedUniforms.uBiomeN.value = N
+}
+buildBiomeTexture()
+
 export const assets = {
   terrainMat: createTerrainMaterial(),
   grassMat: createGrassMaterial(),
   propMat: createPropMaterial(),
   waterMat: createWaterMaterial(),
+  lavaMat: createLavaMaterial(),
   fallMat: createFallMaterial(),
   mistMat: createMistMaterial(),
   grassGeo: spikeClump(),

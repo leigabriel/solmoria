@@ -1,7 +1,8 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { audio } from '../audio/audio'
 import { PLAYER_NAME, QUALITY, type Quality } from '../game/config'
-import { useHud, useSettings } from '../game/store'
+import { biomeState, useHud, useSettings } from '../game/store'
+import { BIOMES } from '../world/biomes'
 import pfp from '../assets/pfp.png'
 import { MapModal } from './MapModal'
 import { Minimap } from './Minimap'
@@ -105,6 +106,43 @@ function BagPanel() {
   )
 }
 
+/** Banner that fades in with the biome name whenever the player settles in a new biome. */
+function BiomeToast() {
+  const [name, setName] = useState('')
+  const [show, setShow] = useState(false)
+  useEffect(() => {
+    let shown = -1
+    let cand = -1
+    let hold = 0
+    let hide: number | undefined
+    const iv = window.setInterval(() => {
+      const id = biomeState.id
+      if (id === shown) {
+        cand = id
+        hold = 0
+        return
+      }
+      if (id !== cand) {
+        cand = id
+        hold = 0
+        return
+      }
+      if (++hold >= 3) {
+        shown = id
+        setName(BIOMES[id].name)
+        setShow(true)
+        window.clearTimeout(hide)
+        hide = window.setTimeout(() => setShow(false), 3200)
+      }
+    }, 350)
+    return () => {
+      window.clearInterval(iv)
+      window.clearTimeout(hide)
+    }
+  }, [])
+  return <div className={`biome-toast${show ? ' on' : ''}`}>{name}</div>
+}
+
 /** Heads-up display: portrait + health (bottom left), bag (bottom right), map (top left), menu (top right). */
 export function Hud() {
   const { hp, maxHp, bagOpen, menuOpen, setBag, setMenu } = useHud()
@@ -131,6 +169,7 @@ export function Hud() {
   return (
     <div className="hud">
       <Minimap />
+      <BiomeToast />
 
       <button className={`hud-ui hud-btn hud-menu${menuOpen ? ' on' : ''}`} onClick={() => setMenu(!menuOpen)} aria-label="Menu">
         <MenuIcon />

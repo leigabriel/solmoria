@@ -3,6 +3,7 @@ import { playerState } from '../game/store'
 import { useHud } from '../game/store'
 import { SEA_LEVEL, VERTS, WORLD_HALF, world } from '../world/terrainData'
 import { villages } from '../world/villages'
+import { BIOMES } from '../world/biomes'
 
 const SIZE = 150
 const VIEW = 96 // world units shown across the square
@@ -30,14 +31,16 @@ export function worldImage() {
         r = 70 - 30 * t
         gg = 150 - 50 * t
         b = 170 - 30 * t
+      } else if (world.lava[i] > -1e8 && world.lava[i] > hh - 0.02) {
+        r = 255; gg = 110; b = 24
       } else if (world.shore[i] > 0.55) {
-        r = 214; gg = 196; b = 140
-      } else if (hh > 17) {
-        const t = Math.min(1, (hh - 17) / 10)
-        r = 150 + 60 * t; gg = 146 + 60 * t; b = 134 + 60 * t
+        const sc = BIOMES[world.biome[i]].shore
+        r = sc[0] * 255; gg = sc[1] * 255; b = sc[2] * 255
       } else {
+        const mc = BIOMES[world.biome[i]].map
         const t = Math.min(1, Math.max(0, hh / 14))
-        r = 90 + 18 * t; gg = 140 + 10 * t; b = 62 + 4 * t
+        const tone = 0.92 + 0.16 * t
+        r = mc[0] * 255 * tone; gg = mc[1] * 255 * tone; b = mc[2] * 255 * tone
       }
       const o = (z * c.width + x) * 4
       img.data[o] = Math.min(255, r * light)

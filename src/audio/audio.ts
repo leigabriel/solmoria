@@ -1,4 +1,4 @@
-import { playerState } from '../game/store'
+import { biomeState, playerState } from '../game/store'
 import { depthAt, world } from '../world/terrainData'
 
 /**
@@ -9,13 +9,16 @@ let ctx: AudioContext | null = null
 let master: GainNode
 let noiseBuf: AudioBuffer
 let windGain: GainNode
+let windFilter: BiquadFilterNode
 let waterGain: GainNode
 let fallGain: GainNode
 let waterFilter: BiquadFilterNode
 let birdTimer = 0
+let lavaTimer = 0
 let waterTimer = 0
 let started = false
 let pendingVolume = 0.7
+type Surface = 'grass' | 'water' | 'sand' | 'snow' | 'rock' | 'mud'
 
 const clamp = (v: number, a: number, b: number) => Math.min(b, Math.max(a, v))
 const rnd = (a: number, b: number) => a + Math.random() * (b - a)
@@ -77,6 +80,7 @@ function buildAmbience() {
   const wf = c.createBiquadFilter()
   wf.type = 'lowpass'
   wf.frequency.value = 420
+  windFilter = wf
   windGain = c.createGain()
   windGain.gain.value = 0.05
   const lfo = c.createOscillator()
@@ -182,10 +186,22 @@ export const audio = {
     }
     birdTimer -= dt
     if (birdTimer <= 0) {
-      birdTimer = rnd(1.2, 5)
-      this.birdSong(rnd(0.02, 0.06), rnd(-0.8, 0.8))
+      birdTimer = rnd(1.2, 5) / Math.max(0.05, biomeState.birds)
+      if (biomeState.birds > 0.08) this.birdSong(rnd(0.02, 0.06) * Math.min(1, biomeState.birds), rnd(-0.8, 0.8))
     }
-    void windGain
+    // lava: low bubbling pops
+    lavaTimer -= dt
+    if (lavaTimer <= 0) {
+      lavaTimer = rnd(0.15, 0.7)
+      if (biomeState.nearLava > 0.25) {
+        const v = biomeState.nearLava
+        burst({ type: 'lowpass', f: rnd(160, 320), q: 1.4, peak: 0.1 * v, attack: 0.01, decay: rnd(0.1, 0.25) })
+        if (Math.random() < 0.4) burst({ f: rnd(1800, 3200), q: 1.2, peak: 0.04 * v, attack: 0.002, decay: 0.05 })
+      }
+    }
+    // wind level / pitch follow the biome; birdsong thins out where there are none
+    windGain.gain.setTargetAtTime(0.02 + biomeState.wind * 0.1, t, 0.8)
+    windFilter.frequency.setTargetAtTime(300 * biomeState.windPitch + 120, t, 0.8)
   },
 
   birdSong(vol = 0.05, pan = 0) {
@@ -196,12 +212,24 @@ export const audio = {
     }
   },
 
-  step(surface: 'grass' | 'water', run: boolean) {
+  step(surface: Surface, run: boolean) {
     if (!ctx) return
     const v = (run ? 0.11 : 0.07) * rnd(0.8, 1.15)
     if (surface === 'water') {
       burst({ f: rnd(500, 800), f2: 1800, q: 0.9, peak: v * 1.6, attack: 0.008, decay: 0.22 })
       tone({ f: rnd(300, 420), f2: rnd(700, 1000), peak: v * 0.35, decay: 0.09, delay: 0.03 })
+    } else if (surface === 'sand') {
+      burst({ f: rnd(1200, 1900), q: 0.5, peak: v * 0.9, attack: 0.012, decay: 0.16 })
+      burst({ type: 'lowpass', f: rnd(300, 420), q: 0.5, peak: v * 0.5, attack: 0.01, decay: 0.12 })
+    } else if (surface === 'snow') {
+      burst({ f: rnd(2600, 3800), q: 0.4, peak: v * 0.8, attack: 0.02, decay: 0.2 })
+      burst({ type: 'lowpass', f: rnd(500, 700), q: 0.6, peak: v * 0.45, attack: 0.015, decay: 0.14 })
+    } else if (surface === 'rock') {
+      burst({ f: rnd(900, 1500), q: 1.4, peak: v * 1.1, attack: 0.002, decay: 0.05 })
+      tone({ f: rnd(140, 190), f2: rnd(90, 120), peak: v * 0.5, decay: 0.07 })
+    } else if (surface === 'mud') {
+      burst({ type: 'lowpass', f: rnd(260, 420), q: 1.2, peak: v * 1.5, attack: 0.012, decay: 0.2 })
+      tone({ f: rnd(110, 160), f2: rnd(190, 260), peak: v * 0.4, decay: 0.1, delay: 0.02 })
     } else {
       burst({ f: rnd(2200, 3400), q: 0.7, peak: v, attack: 0.004, decay: 0.09 })
       burst({ type: 'lowpass', f: rnd(160, 260), q: 0.7, peak: v * 0.8, attack: 0.003, decay: 0.07 })
@@ -213,7 +241,7 @@ export const audio = {
     tone({ f: 260, f2: 520, type: 'sine', peak: 0.03, decay: 0.12 })
   },
 
-  land(surface: 'grass' | 'water') {
+  land(surface: Surface) {
     if (surface === 'water') burst({ f: 600, f2: 1600, q: 0.8, peak: 0.2, attack: 0.01, decay: 0.3 })
     else {
       burst({ type: 'lowpass', f: 220, q: 0.7, peak: 0.16, attack: 0.003, decay: 0.12 })

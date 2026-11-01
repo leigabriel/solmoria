@@ -5,7 +5,8 @@ import { PLAYER } from '../game/config'
 import { input, playerState } from '../game/store'
 import { readMove } from '../input/useKeyboard'
 import { sharedUniforms } from '../shaders/materials'
-import { depthAt, heightAt, WORLD_HALF, world } from '../world/terrainData'
+import { biomeAt, depthAt, heightAt, lavaAt, WORLD_HALF, world } from '../world/terrainData'
+import { BIOMES } from '../world/biomes'
 import { resolveCollisions } from '../world/scatter'
 import { audio } from '../audio/audio'
 import { combat, tickCombat } from '../combat/state'
@@ -15,6 +16,8 @@ import { animateCharacter, createCharacter, disposeCharacter, type CharacterRig 
 export const playerRig: { current: CharacterRig | null } = { current: null }
 
 const mv = { x: 0, y: 0, walk: false }
+const LAVA_PROBE: [number, number][] = [[0, 0], [0.45, 0], [-0.45, 0], [0, 0.45], [0, -0.45]]
+const surfaceAt = (x: number, z: number) => (depthAt(x, z) > 0.06 ? 'water' : BIOMES[biomeAt(x, z)].surface)
 const damp = THREE.MathUtils.damp
 
 function lerpAngle(a: number, b: number, t: number) {
@@ -78,11 +81,20 @@ export function Player() {
     const slow = d0 > 0.05 ? 1 - Math.min(0.45, d0 * 0.6) : 1
     const nx = pos.x + vel.x * dt * slow
     const nz = pos.z + vel.z * dt * slow
-    if (depthAt(nx, nz) < 1.0) {
+    // lava is solid ground you can't wade into: block at its edge (a small margin keeps you off the glow)
+    const lavaBlocked = (x: number, z: number) => {
+      for (const [ox, oz] of LAVA_PROBE) {
+        const l = lavaAt(x + ox, z + oz)
+        if (l !== null && l > heightAt(x + ox, z + oz) - 0.02) return true
+      }
+      return false
+    }
+    const clearAt = (x: number, z: number) => depthAt(x, z) < 1.0 && !lavaBlocked(x, z)
+    if (clearAt(nx, nz)) {
       pos.x = nx
       pos.z = nz
-    } else if (depthAt(nx, pos.z) < 1.0) pos.x = nx
-    else if (depthAt(pos.x, nz) < 1.0) pos.z = nz
+    } else if (clearAt(nx, pos.z)) pos.x = nx
+    else if (clearAt(pos.x, nz)) pos.z = nz
     else { vel.x = 0; vel.z = 0 }
     const lim = WORLD_HALF - 6
     pos.x = Math.max(-lim, Math.min(lim, pos.x))
@@ -109,7 +121,7 @@ export function Player() {
         pos.y = ground
         playerState.grounded = true
         playerState.vy = 0
-        audio.land(depthAt(pos.x, pos.z) > 0.06 ? 'water' : 'grass')
+        audio.land(surfaceAt(pos.x, pos.z))
       }
     }
 
@@ -132,7 +144,7 @@ export function Player() {
       playerState.grounded ? 0 : 1,
     )
     if (speed > 0.9 && !attacking && playerState.grounded && Math.floor(rig.phase / Math.PI) !== prevPhase) {
-      audio.step(depthAt(pos.x, pos.z) > 0.06 ? 'water' : 'grass', speed > 3.6)
+      audio.step(surfaceAt(pos.x, pos.z), speed > 3.6)
     }
     sharedUniforms.uPlayer.value.copy(pos)
   })

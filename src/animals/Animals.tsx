@@ -6,7 +6,8 @@ import { WORLD_SEED } from '../game/config'
 import { playerState } from '../game/store'
 import { mulberry32 } from '../utils/random'
 import { forestMask, meadowMask } from '../world/biome'
-import { depthAt, heightAt, shoreAt, siteClearance, slopeAt, world, WORLD_HALF, type Site } from '../world/terrainData'
+import { B } from '../world/biomes'
+import { biomeAt, lavaAt, depthAt, heightAt, shoreAt, siteClearance, slopeAt, world, WORLD_HALF, type Site } from '../world/terrainData'
 import { siteGeometry } from '../world/structures'
 import { makeSpecies, type SpeciesDef } from './species'
 
@@ -32,6 +33,13 @@ interface Animal {
   lineSeed?: number
 }
 
+/** lava, volcanic rock and caverns hold no wildlife */
+const badGround = (x: number, z: number) => {
+  const b = biomeAt(x, z)
+  return b === B.Volcanic || b === B.Cave || lavaAt(x, z) !== null
+}
+const inB = (x: number, z: number, ...ids: number[]) => ids.includes(biomeAt(x, z))
+
 const NPC_NAMES = ['Pip', 'Mara', 'Tobin', 'Elsie', 'Barnaby', 'Willa', 'Odo', 'Nell', 'Fenn', 'Juniper', 'Rook', 'Tansy', 'Bram', 'Posy']
 
 const animals: Animal[] = []
@@ -54,7 +62,7 @@ export function nearestNpc(x: number, z: number, r: number) {
 function villagerOk(a: Animal, x: number, z: number) {
   const site = a.home!
   if (Math.hypot(x - site.x, z - site.z) > 17.5) return false
-  if (depthAt(x, z) > 0.04 || slopeAt(x, z) > 0.7) return false
+  if (depthAt(x, z) > 0.04 || slopeAt(x, z) > 0.7 || badGround(x, z)) return false
   for (const c of siteGeometry(site).cols) if (Math.hypot(c.x - x, c.z - z) < c.r + 0.4) return false
   return true
 }
@@ -86,7 +94,7 @@ const _leg = new THREE.Matrix4()
 
 function okLand(x: number, z: number, maxSlope = 0.45) {
   if (Math.abs(x) > WORLD_HALF - 12 || Math.abs(z) > WORLD_HALF - 12) return false
-  if (depthAt(x, z) > 0.04 || shoreAt(x, z) > 0.55) return false
+  if (depthAt(x, z) > 0.04 || shoreAt(x, z) > 0.55 || badGround(x, z)) return false
   if (slopeAt(x, z) > maxSlope) return false
   return siteClearance(x, z) > 0.5
 }
@@ -119,11 +127,11 @@ function populate() {
       if (n) placed++
     }
   }
-  herd(sp.cow, 9, 4, (x, z) => meadowMask(x, z) > 0.4 && forestMask(x, z) < 0.6)
-  herd(sp.horse, 7, 3, (x, z) => heightAt(x, z) > 2 && forestMask(x, z) < 0.65, 0.3)
-  herd(sp.sheep, 9, 6, (x, z) => heightAt(x, z) > 1 && meadowMask(x, z) > 0.3, 0.4)
-  herd(sp.deer, 7, 3, (x, z) => forestMask(x, z) > 0.5, 0.45)
-  herd(sp.rabbit, 14, 3, (x, z) => meadowMask(x, z) > 0.25, 0.5)
+  herd(sp.cow, 9, 4, (x, z) => inB(x, z, B.Grass, B.Forest, B.Tropical) && meadowMask(x, z) > 0.4 && forestMask(x, z) < 0.6)
+  herd(sp.horse, 7, 3, (x, z) => inB(x, z, B.Grass, B.Forest, B.Desert, B.Mountain) && heightAt(x, z) > 2 && forestMask(x, z) < 0.65, 0.3)
+  herd(sp.sheep, 9, 6, (x, z) => inB(x, z, B.Grass, B.Forest, B.Mountain, B.Snow) && heightAt(x, z) > 1 && meadowMask(x, z) > 0.3, 0.4)
+  herd(sp.deer, 9, 4, (x, z) => inB(x, z, B.Forest, B.Snow, B.Magical, B.Mountain) || (inB(x, z, B.Grass) && forestMask(x, z) > 0.5), 0.45)
+  herd(sp.rabbit, 14, 3, (x, z) => inB(x, z, B.Grass, B.Forest, B.Snow, B.Magical, B.Tropical) && meadowMask(x, z) > 0.25, 0.5)
   // villagers wander inside their village; a few chickens and a hound-less yard feel
   for (const site of world.sites) {
     if (site.type !== 'village') continue

@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import { createNoiseTexture } from '../utils/noiseTexture'
+import { BIOMES, BIOME_COUNT } from '../world/biomes'
 
 /** Uniforms shared by every custom material (updated once per frame). */
 export const sharedUniforms = {
@@ -8,7 +9,15 @@ export const sharedUniforms = {
   uWindDir: { value: new THREE.Vector2(0.8, 0.6).normalize() },
   uNoise: { value: createNoiseTexture() },
   uPxPerUnit: { value: 600 },
+  /** coarse biome-id map (1 texel = BIOME_CELL world units), set by assets.ts once the world exists */
+  uBiomeTex: { value: new THREE.DataTexture(new Uint8Array([0]), 1, 1, THREE.RedFormat) },
+  uBiomeN: { value: 1 },
 }
+
+/** palette rows per biome: 4 ground bands, dirt, shore, rock */
+export const BIOME_PALETTE = BIOMES.flatMap((b) => [...b.bands, b.dirt, b.shore, b.rock].map((c) => new THREE.Vector3(c[0], c[1], c[2])))
+export const BIOME_CELL = 4
+
 
 const DECL = /* glsl */ `
 uniform float uTime;
@@ -38,20 +47,25 @@ function bind(shader: Shader) {
   shader.uniforms.uPxPerUnit = sharedUniforms.uPxPerUnit
 }
 
+const PAL_ROWS = 7
+
 // ---------------------------------------------------------------------------------------------
 // Terrain: posterised painterly greens + hollows + dirt, sand at the shore, rock on steep faces,
 // baked contact shadows (aAO) under props.
 // ---------------------------------------------------------------------------------------------
 export function createTerrainMaterial() {
   const m = new THREE.MeshLambertMaterial({ color: 0xffffff })
-  m.customProgramCacheKey = () => 'solmoria-terrain-2'
+  m.customProgramCacheKey = () => 'solmoria-terrain-3'
   m.onBeforeCompile = (shader) => {
     bind(shader)
+    shader.uniforms.uBiomeTex = sharedUniforms.uBiomeTex
+    shader.uniforms.uBiomeN = sharedUniforms.uBiomeN
+    shader.uniforms.uPal = { value: BIOME_PALETTE }
     shader.vertexShader = shader.vertexShader
       .replace('#include <common>', '#include <common>\nattribute float aShore;\nattribute float aAO;\nvarying float vShore;\nvarying float vAO;\nvarying vec3 vWPos;\nvarying vec3 vWN;')
       .replace('#include <begin_vertex>', '#include <begin_vertex>\nvShore = aShore; vAO = aAO; vWPos = (modelMatrix * vec4(transformed, 1.0)).xyz; vWN = normal;')
     shader.fragmentShader = shader.fragmentShader
-      .replace('#include <common>', `#include <common>\n${DECL}\nvarying float vShore;\nvarying float vAO;\nvarying vec3 vWPos;\nvarying vec3 vWN;`)
+      .replace('#include <common>', `#include <common>\n${DECL}\nvarying float vShore;\nvarying float vAO;\nvarying vec3 vWPos;\nvarying vec3 vWN;\nuniform sampler2D uBiomeTex;\nuniform float uBiomeN;\nuniform vec3 uPal[${BIOME_COUNT * PAL_ROWS}];`)
       .replace(
         '#include <color_fragment>',
         /* glsl */ `
@@ -65,10 +79,23 @@ export function createTerrainMaterial() {
   float stipple = (hash21(floor(p * 7.0)) - 0.5) * 0.035;
   float band = n1 * 0.72 + n2 * 0.28 + stipple;
 
-  vec3 c0 = vec3(0.22, 0.40, 0.13);
-  vec3 c1 = vec3(0.33, 0.51, 0.17);
-  vec3 c2 = vec3(0.45, 0.61, 0.21);
-  vec3 c3 = vec3(0.60, 0.70, 0.29);
+  // biome blend: 4 coarse texels, edges ragged by noise and softened by smoothstep
+  vec2 bp = (p + (vec2(nR(uv * 3.1 + 0.2), nG(uv * 3.1 + 0.7)) - 0.5) * 7.0 + ${512 / 2}.0) * (1.0 / ${BIOME_CELL}.0) - 0.5;
+  vec2 bi = floor(bp);
+  vec2 bt = fract(bp);
+  bt = bt * bt * (3.0 - 2.0 * bt);
+  vec4 bw = vec4((1.0 - bt.x) * (1.0 - bt.y), bt.x * (1.0 - bt.y), (1.0 - bt.x) * bt.y, bt.x * bt.y);
+  vec3 c0 = vec3(0.0), c1 = vec3(0.0), c2 = vec3(0.0), c3 = vec3(0.0), dirtC = vec3(0.0), shoreC = vec3(0.0), rockB = vec3(0.0);
+  float bSnowW = 0.0;
+  for (int k = 0; k < 4; k++) {
+    vec2 o = vec2(float(k - (k / 2) * 2), float(k / 2));
+    float id = floor(texture2D(uBiomeTex, (clamp(bi + o, 0.0, uBiomeN - 1.0) + 0.5) / uBiomeN).r * 255.0 + 0.5);
+    float wk = bw[k];
+    int r = int(id) * ${PAL_ROWS};
+    c0 += uPal[r] * wk; c1 += uPal[r + 1] * wk; c2 += uPal[r + 2] * wk; c3 += uPal[r + 3] * wk;
+    dirtC += uPal[r + 4] * wk; shoreC += uPal[r + 5] * wk; rockB += uPal[r + 6] * wk;
+    bSnowW += step(2.5, id) * step(id, 3.5) * wk;
+  }
   vec3 col = c0;
   col = mix(col, c1, smoothstep(0.34, 0.365, band));
   col = mix(col, c2, smoothstep(0.46, 0.485, band));
@@ -77,19 +104,22 @@ export function createTerrainMaterial() {
   float hol = 1.0 - smoothstep(0.30, 0.42, nB(uv * 0.9 + 0.6));
   col *= mix(1.0, 0.62, hol);
   float dirt = smoothstep(0.70, 0.74, nA(uv * 2.9 + 0.4));
-  col = mix(col, vec3(0.58, 0.36, 0.15), dirt * 0.85);
+  col = mix(col, dirtC, dirt * 0.85);
 
   // shoreline: sand + wet band, murky bed under water
   float sandAmt = smoothstep(0.38, 0.78, vShore + (n2 - 0.5) * 0.35);
-  col = mix(col, vec3(0.80, 0.70, 0.46), sandAmt);
+  col = mix(col, shoreC, sandAmt);
   col *= 1.0 - 0.22 * smoothstep(0.85, 1.0, vShore);
   col = mix(col, vec3(0.42, 0.40, 0.30), smoothstep(0.995, 1.0, vShore) * 0.7);
 
   // steep faces (cliffs, banks) turn to rock
   float rk = smoothstep(0.82, 0.60, vWN.y);
-  vec3 rockc = mix(vec3(0.50, 0.45, 0.40), vec3(0.64, 0.57, 0.46), n2);
-  rockc = mix(rockc, vec3(0.38, 0.34, 0.30), smoothstep(0.55, 0.78, nG(uv * 5.0)));
+  vec3 rockc = mix(rockB * 0.92, rockB * 1.16, n2);
+  rockc = mix(rockc, rockB * 0.7, smoothstep(0.55, 0.78, nG(uv * 5.0)));
   col = mix(col, rockc, rk);
+  // snow caps on the tallest peaks, snow also clings to gentle slopes in the snow biome
+  float cap = smoothstep(21.0, 24.5, vWPos.y + (n2 - 0.5) * 3.0) * (1.0 - bSnowW);
+  col = mix(col, vec3(0.93, 0.95, 0.98), cap * (1.0 - 0.7 * rk));
 
   col *= 1.0 - 0.42 * vAO;
   col = toLinear(col);
@@ -350,4 +380,42 @@ export function createMistMaterial() {
         gl_FragColor = vec4(0.93, 0.98, 0.98, a);
       }`,
   })
+}
+
+// ---------------------------------------------------------------------------------------------
+// Lava: unlit, slowly flowing molten crust with bright cracks (HDR so bloom picks it up).
+// ---------------------------------------------------------------------------------------------
+export function createLavaMaterial() {
+  const m = new THREE.MeshBasicMaterial({ color: 0xffffff, toneMapped: false })
+  m.customProgramCacheKey = () => 'solmoria-lava-1'
+  m.onBeforeCompile = (shader) => {
+    bind(shader)
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', '#include <common>\nvarying vec3 vWPos;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvWPos = (modelMatrix * vec4(transformed, 1.0)).xyz;')
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', `#include <common>\n${DECL}\nvarying vec3 vWPos;`)
+      .replace(
+        '#include <color_fragment>',
+        /* glsl */ `
+#include <color_fragment>
+{
+  vec2 uv = vWPos.xz * (1.0 / 64.0);
+  vec2 flow = vec2(0.012, 0.007) * uTime;
+  float a = nR(uv * 2.0 + flow);
+  float b = nG(uv * 3.7 - flow * 1.3 + 0.3);
+  float n = a * 0.6 + b * 0.4;
+  float crack = smoothstep(0.42, 0.5, abs(n - 0.5) * 2.0 + 0.0) ;
+  vec3 crust = vec3(0.32, 0.05, 0.02);
+  vec3 hot = vec3(1.35, 0.5, 0.06);
+  vec3 mid = vec3(0.95, 0.2, 0.03);
+  vec3 col = mix(hot, mid, smoothstep(0.35, 0.6, n));
+  col = mix(col, crust, smoothstep(0.55, 0.78, n) * 0.85);
+  col += vec3(0.18, 0.05, 0.0) * (0.5 + 0.5 * sin(uTime * 1.4 + a * 9.0));
+  diffuseColor.rgb = col;
+}
+`,
+      )
+  }
+  return m
 }

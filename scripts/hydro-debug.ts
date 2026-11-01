@@ -35,3 +35,25 @@ for (const f of w.falls) dot(f.pts[0], f.pts[2], [255, 40, 40], 4)
 for (const s of w.sites) dot(s.x, s.z, [255, 230, 40], 3)
 dot(w.spawn.x, w.spawn.z, [255, 255, 255], 4)
 writeFileSync(process.argv[2] ?? 'hydro.ppm', Buffer.concat([Buffer.from(`P6\n${W} ${W}\n255\n`), buf]))
+
+// ---- biome report: share per biome + a biome-coloured map next to the output (<out>.biome.ppm) -------
+{
+  const names = ['Grass', 'Forest', 'Desert', 'Snow', 'Tropical', 'Swamp', 'Volcanic', 'Mountain', 'Cave', 'Magical']
+  const counts = new Array(names.length).fill(0)
+  for (const b of w.biome) counts[b]++
+  console.log('biomes', names.map((n, i) => `${n} ${((counts[i] / w.biome.length) * 100).toFixed(1)}%`).join(' | '))
+  const v = w.features.volcano
+  console.log('volcano', v ? `${v.x},${v.z} lava@${v.lavaLevel.toFixed(1)}` : 'none', 'caves', w.features.caves.map((c) => `${c.x},${c.z} floor ${c.floor.toFixed(1)}`).join(' | '), 'magic', w.features.magic)
+  let lavaCells = 0
+  for (const l of w.lava) if (l > NO_WATER / 2) lavaCells++
+  console.log('lava cells', lavaCells)
+  const pal = [[120, 190, 80], [40, 120, 50], [225, 195, 110], [240, 245, 250], [60, 190, 120], [110, 120, 70], [200, 60, 30], [130, 125, 120], [60, 50, 80], [190, 120, 230]]
+  const bb = Buffer.alloc(VERTS * VERTS * 3)
+  for (let c = 0; c < VERTS * VERTS; c++) {
+    let col = pal[w.biome[c]]
+    if (w.depth[c] > 0.02) col = [40, 100, 190]
+    if (w.lava[c] > NO_WATER / 2) col = [255, 120, 20]
+    bb[c * 3] = col[0]; bb[c * 3 + 1] = col[1]; bb[c * 3 + 2] = col[2]
+  }
+  if (process.argv[2]) writeFileSync(process.argv[2].replace(/\.ppm$/, '') + '.biome.ppm', Buffer.concat([Buffer.from(`P6\n${VERTS} ${VERTS}\n255\n`), bb]))
+}

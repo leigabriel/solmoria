@@ -37,3 +37,18 @@ export function siteClearance(x: number, z: number) {
   for (const s of world.sites) best = Math.min(best, Math.hypot(x - s.x, z - s.z) - s.radius)
   return best
 }
+
+const NO_LAVA = -1e8
+/** Biome id (see biomes.ts) at a world position (nearest cell). */
+export function biomeAt(x: number, z: number) {
+  const ix = Math.min(VERTS - 1, Math.max(0, Math.round(x + WORLD_HALF)))
+  const iz = Math.min(VERTS - 1, Math.max(0, Math.round(z + WORLD_HALF)))
+  return world.biome[iz * VERTS + ix]
+}
+/** Lava surface height at the point, or null when there is no lava. */
+export function lavaAt(x: number, z: number) {
+  const ix = Math.min(VERTS - 1, Math.max(0, Math.round(x + WORLD_HALF)))
+  const iz = Math.min(VERTS - 1, Math.max(0, Math.round(z + WORLD_HALF)))
+  const l = world.lava[iz * VERTS + ix]
+  return l > NO_LAVA ? l : null
+}

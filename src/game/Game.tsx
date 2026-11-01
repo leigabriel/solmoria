@@ -1,5 +1,6 @@
 import { Canvas } from '@react-three/fiber'
 import { PCFShadowMap } from 'three'
+import { BiomeAtmosphere } from '../atmosphere/BiomeAtmosphere'
 import { Effects } from '../atmosphere/Effects'
 import { GodRays } from '../atmosphere/GodRays'
 import { Lighting } from '../atmosphere/Lighting'
@@ -32,6 +33,7 @@ export function Game() {
     >
       <color attach="background" args={[SKY_COLOR]} />
       <fog attach="fog" args={[SKY_COLOR, 40, 100]} />
+      <BiomeAtmosphere />
       <Lighting />
       <World />
       <Player />

@@ -44,6 +44,28 @@ export const playerState = {
   grounded: true,
 }
 
+/** Live biome state (updated every frame by BiomeAtmosphere, read by lights, particles, audio, HUD). */
+export const biomeState = {
+  /** dominant biome id under the player */
+  id: 0,
+  /** smoothed influence per biome, sums to ~1 */
+  w: new Float32Array(10).fill(0).map((_, i) => (i === 0 ? 1 : 0)),
+  /** blended atmosphere */
+  hemiSky: new THREE.Color('#e7f3c8'),
+  hemiGround: new THREE.Color('#58702a'),
+  hemi: 1.55,
+  sun: new THREE.Color('#fff1cf'),
+  sunI: 2.5,
+  particleColor: new THREE.Color(1.4, 1.3, 0.7),
+  particleFall: -0.05,
+  particleSize: 0.16,
+  wind: 0.4,
+  birds: 1,
+  windPitch: 1,
+  /** set by the player when standing on lava-adjacent ground etc. */
+  nearLava: 0,
+}
+
 export const input = {
   keys: new Set<string>(),
   joyX: 0,

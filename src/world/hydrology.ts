@@ -1,5 +1,7 @@
 import { createNoise2D } from 'simplex-noise'
 import { hashInts, mulberry32 } from '../utils/random'
+import { applyBiomes, type BiomeFeatures } from './biomeGen'
+import { B } from './biomes'
 
 /**
  * Finite world with simulated hydrology.
@@ -50,6 +52,11 @@ export interface WorldData {
   /** 1 in water, fading to 0 about 4.5 units from the shore */
   shore: Float32Array
   falls: Fall[]
+  /** biome id per cell (see biomes.ts) */
+  biome: Uint8Array
+  /** lava surface height, NO_WATER where none */
+  lava: Float32Array
+  features: BiomeFeatures
   sites: Site[]
   spawn: { x: number; z: number }
   stats: { riverCells: number; lakes: { x: number; z: number; area: number; level: number }[]; falls: number; sites: number }
@@ -499,6 +506,13 @@ export function generateWorld(seed: number): WorldData {
     falls.push({ pts, width: widthOf(c) * 0.9, drop: lipBed - baseBed, baseY: baseW })
   }
 
+  // ---------------------------------------------------------------- 6b. biomes (terrain shaping, volcano, caverns, swamp ponds)
+  const wetMask = new Uint8Array(total)
+  for (let c = 0; c < total; c++) wetMask[c] = lakeMask[c] || riverWl[c] > NO_WATER / 2 || h[c] < SEA_LEVEL + 0.3 ? 1 : 0
+  const bio = applyBiomes({ seed, h, riverWl, water: wetMask, lake: lakeMask, VERTS, H, seaLevel: SEA_LEVEL, noWater: NO_WATER })
+  const biome = bio.biome
+  const lava = bio.lava
+
   // ---------------------------------------------------------------- 7. combine water (lakes > rivers > sea)
   for (let c = 0; c < total; c++) {
     if (lakeMask[c]) continue
@@ -568,8 +582,13 @@ export function generateWorld(seed: number): WorldData {
     return (arr[i] * (1 - tx) + arr[i + 1] * tx) * (1 - tz) + (arr[i + VERTS] * (1 - tx) + arr[i + VERTS + 1] * tx) * tz
   }
   const sites: Site[] = []
+  const badBiome = (x: number, z: number) => {
+    const b = biome[clamp(Math.round(z) + H, 0, VERTS - 1) * VERTS + clamp(Math.round(x) + H, 0, VERTS - 1)]
+    return b === B.Volcanic || b === B.Cave
+  }
   const suitable = (x: number, z: number, r: number, tol = 1.6) => {
     if (Math.abs(x) > H - 40 || Math.abs(z) > H - 40) return false
+    if (badBiome(x, z) || badBiome(x + r, z) || badBiome(x - r, z) || badBiome(x, z + r) || badBiome(x, z - r)) return false
     const h0 = bil(h, x, z)
     if (h0 < SEA_LEVEL + 1.5) return false
     for (const rr of [0, r * 0.5, r, r + 7]) {
@@ -605,6 +624,7 @@ export function generateWorld(seed: number): WorldData {
   }
   const villageOk = (x: number, z: number) => {
     if (Math.abs(x) > H - 50 || Math.abs(z) > H - 50) return false
+    for (const [ox, oz] of [[0, 0], [24, 0], [-24, 0], [0, 24], [0, -24]]) if (badBiome(x + ox, z + oz)) return false
     const h0 = bil(h, x, z)
     if (h0 < SEA_LEVEL + 1.5 || h0 > 16) return false
     for (const rr of [0, 6, 12, 18, 24]) {
@@ -688,6 +708,9 @@ export function generateWorld(seed: number): WorldData {
     flowZ,
     shore,
     falls,
+    biome,
+    lava,
+    features: bio.features,
     sites,
     spawn,
     stats: { riverCells: riverCells.length, lakes: realLakes, falls: falls.length, sites: sites.length },

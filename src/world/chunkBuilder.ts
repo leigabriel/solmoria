@@ -7,8 +7,9 @@ import { forestMask, meadowMask } from './biome'
 import { NO_WATER } from './hydrology'
 import { PropBatch } from './propBatch'
 import { getChunkData } from './scatter'
-import { depthAt, heightAt, shoreAt, siteClearance, slopeAt, VERTS, world, WORLD_HALF } from './terrainData'
-import { DARK_BUSH, FERN_PARTS, PALETTE, PALETTE_KEYS, ROUND_BUSH, TPL, TREE_PARTS, type Part } from './templates'
+import { biomeAt, depthAt, heightAt, shoreAt, siteClearance, slopeAt, VERTS, world, WORLD_HALF } from './terrainData'
+import { B, BIOMES } from './biomes'
+import { ASH_BUSH, DARK_BUSH, DRY_BUSH, FERN_PARTS, FROST_BUSH, GLOW_BUSH, SWAMP_BUSH, TROPIC_BUSH, PALETTE, PALETTE_KEYS, ROUND_BUSH, TPL, TREE_PARTS, type Part } from './templates'
 import type { Template } from './propBatch'
 
 const UP = new THREE.Vector3(0, 1, 0)
@@ -205,6 +206,50 @@ function waterMesh(cx: number, cz: number) {
   return m
 }
 
+/** Lava sheet: one quad per grid cell that has lava above the ground; vertices without lava sink under the terrain. */
+function lavaMesh(cx: number, cz: number) {
+  const N = CHUNK_SEGMENTS
+  const n1 = N + 1
+  const ox = cx * CHUNK_SIZE + WORLD_HALF
+  const oz = cz * CHUNK_SIZE + WORLD_HALF
+  const ok = new Uint8Array(n1 * n1)
+  const pos = new Float32Array(n1 * n1 * 3)
+  let any = false
+  for (let j = 0; j <= N; j++) {
+    for (let i = 0; i <= N; i++) {
+      const c = (oz + j) * VERTS + ox + i
+      const k = j * n1 + i
+      const l = world.lava[c]
+      const hh = world.h[c]
+      const live = l > NO_WATER / 2 && l > hh - 0.02
+      ok[k] = live ? 1 : 0
+      if (live) any = true
+      pos[k * 3] = ox + i - WORLD_HALF
+      pos[k * 3 + 1] = live ? l : hh - 0.6
+      pos[k * 3 + 2] = oz + j - WORLD_HALF
+    }
+  }
+  if (!any) return null
+  const idx: number[] = []
+  for (let j = 0; j < N; j++) {
+    for (let i = 0; i < N; i++) {
+      const a = j * n1 + i
+      const b = a + 1
+      const c = a + n1
+      const d = c + 1
+      if (ok[a] + ok[b] + ok[c] + ok[d] >= 2) idx.push(a, c, b, b, c, d)
+    }
+  }
+  if (!idx.length) return null
+  const g = new THREE.BufferGeometry()
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3))
+  g.setIndex(idx)
+  g.computeBoundingSphere()
+  const m = new THREE.Mesh(g, assets.lavaMat)
+  m.userData.own = true
+  return m
+}
+
 function fallObjects(cx: number, cz: number) {
   const out: THREE.Object3D[] = []
   const x0 = cx * CHUNK_SIZE
@@ -294,6 +339,8 @@ function* grassStep(cx: number, cz: number, q: QualitySettings, group: THREE.Gro
     const c = rng()
     if (i % 1500 === 1499) yield
     if (depthAt(x, z) > 0) continue
+    const gb = BIOMES[biomeAt(x, z)].grass
+    if (gb.density < 1 && a > gb.density) continue
     const shore = shoreAt(x, z)
     if (shore > 0.72) continue
     if (slopeAt(x, z) > 0.9) continue
@@ -312,11 +359,12 @@ function* grassStep(cx: number, cz: number, q: QualitySettings, group: THREE.Gro
     const z = keep[i * 5 + 1]
     const yaw = (keep[i * 5 + 2] - 0.5) * 1.0 // stay roughly camera-facing so the "| \ /" spikes read
     const sw = 0.85 + keep[i * 5 + 3] * 0.5
-    const sh = 0.55 + keep[i * 5 + 4] * 0.55
+    const gb = BIOMES[biomeAt(x, z)].grass
+    const sh = (0.55 + keep[i * 5 + 4] * 0.55) * gb.height
     _q.setFromAxisAngle(UP, yaw)
     _loc.compose(_p.set(x, heightAt(x, z) - 0.02, z), _q, _s.set(sw, sh, sw))
     mesh.setMatrixAt(i, _loc)
-    _c.setHSL(0.235 + (keep[i * 5 + 3] - 0.5) * 0.05, 0.5 + keep[i * 5 + 4] * 0.12, 0.27 + keep[i * 5 + 2] * 0.12, THREE.SRGBColorSpace)
+    _c.setHSL(gb.hsl[0] + (keep[i * 5 + 3] - 0.5) * 0.05, gb.hsl[1] + keep[i * 5 + 4] * 0.12, gb.hsl[2] - 0.03 + keep[i * 5 + 2] * 0.12, THREE.SRGBColorSpace)
     mesh.setColorAt(i, _c)
   }
   mesh.instanceMatrix.needsUpdate = true
@@ -349,6 +397,24 @@ function addBush(b: PropBatch, bu: ReturnType<typeof getChunkData>['bushes'][num
     case 'fern':
       putParts(b, FERN_PARTS, bu.v)
       break
+    case 'dry':
+      putParts(b, DRY_BUSH, bu.v)
+      break
+    case 'frost':
+      putParts(b, FROST_BUSH, bu.v)
+      break
+    case 'glow':
+      putParts(b, GLOW_BUSH, bu.v)
+      break
+    case 'tropic':
+      putParts(b, TROPIC_BUSH, bu.v)
+      break
+    case 'swamp':
+      putParts(b, SWAMP_BUSH, bu.v)
+      break
+    case 'ash':
+      putParts(b, ASH_BUSH, bu.v)
+      break
     case 'flowering':
     case 'berry': {
       putParts(b, DARK_BUSH, bu.v)
@@ -369,7 +435,7 @@ function addBush(b: PropBatch, bu: ReturnType<typeof getChunkData>['bushes'][num
 }
 
 function addFlower(b: PropBatch, f: ReturnType<typeof getChunkData>['flowers'][number]) {
-  setBase(f.x, f.y, f.z, f.r, 1)
+  setBase(f.x, f.y, f.z, f.r, f.glow ? 1.15 : 1)
   const s = f.s
   const col = PALETTE[PALETTE_KEYS[f.c1]]
   switch (f.kind) {
@@ -410,15 +476,40 @@ function addFlower(b: PropBatch, f: ReturnType<typeof getChunkData>['flowers'][n
   }
 }
 
+// per-biome stone colours: [light, dark]
+const STONES: Record<number, [THREE.Color, THREE.Color]> = {
+  [B.Desert]: [srgb(0.82, 0.6, 0.36), srgb(0.66, 0.44, 0.26)],
+  [B.Snow]: [srgb(0.82, 0.88, 0.94), srgb(0.6, 0.68, 0.78)],
+  [B.Volcanic]: [srgb(0.2, 0.17, 0.17), srgb(0.1, 0.08, 0.09)],
+  [B.Mountain]: [srgb(0.6, 0.58, 0.56), srgb(0.42, 0.42, 0.44)],
+  [B.Cave]: [srgb(0.34, 0.3, 0.42), srgb(0.2, 0.18, 0.28)],
+  [B.Magical]: [srgb(0.66, 0.6, 0.8), srgb(0.46, 0.4, 0.62)],
+  [B.Swamp]: [srgb(0.42, 0.46, 0.36), srgb(0.3, 0.34, 0.26)],
+}
+const CRYSTALS: THREE.Color[] = [srgb(0.55, 0.45, 1), srgb(0.4, 0.9, 1), srgb(1, 0.5, 0.85)]
+
 function addRock(b: PropBatch, r: ReturnType<typeof getChunkData>['rocks'][number]) {
   setBase(r.x, r.y, r.z, r.r, 1)
   const s = r.s
+  if (r.kind === 'crystal') {
+    const col = CRYSTALS[Math.floor(r.v * 3) % 3]
+    for (let i = 0; i < 4; i++) {
+      const a = i * 1.7 + r.r
+      const h = (0.8 + ((i * 37 + r.v * 100) % 10) / 10) * s
+      put(b, TPL.cone, Math.cos(a) * 0.22 * s, 0, Math.sin(a) * 0.22 * s, 0.14 * s, h, 0.14 * s, Math.sin(a) * 0.3, 0, -Math.cos(a) * 0.3, col, 0, 1.1)
+    }
+    return
+  }
+  const st = STONES[r.biome]
+  const c1 = st ? st[0] : r.kind === 'rock' ? SOLID_STONE : GREY_STONE
+  const c2 = st ? st[1] : r.kind === 'rock' ? SOLID_STONE2 : GREY_STONE2
+  const moss = st ? 0 : r.kind === 'rock' ? (r.v > 0.5 ? 1 : 0) : 1
   if (r.kind === 'flat') {
-    put(b, TPL.rock, 0, 0.0, 0, s * 0.8, s * 0.2, s * 0.7, 0, 0, 0, _c.copy(GREY_STONE).lerp(GREY_STONE2, r.v), 0, 0, 1)
+    put(b, TPL.rock, 0, 0.0, 0, s * 0.8, s * 0.2, s * 0.7, 0, 0, 0, _c.copy(c1).lerp(c2, r.v), 0, 0, moss)
   } else if (r.kind === 'boulder') {
-    put(b, TPL.rock, 0, 0.3 * s, 0, s * (1 + r.v * 0.4), s * 0.75, s * (1.1 - r.v * 0.2), r.v * 0.3, 0, r.v * 0.2, _c.copy(GREY_STONE).lerp(GREY_STONE2, r.v), 0, 0, 1)
+    put(b, TPL.rock, 0, 0.3 * s, 0, s * (1 + r.v * 0.4), s * 0.75, s * (1.1 - r.v * 0.2), r.v * 0.3, 0, r.v * 0.2, _c.copy(c1).lerp(c2, r.v), 0, r.biome === B.Volcanic && r.v > 0.7 ? 0.5 : 0, moss)
   } else {
-    put(b, TPL.rock, 0, 0.1 * s, 0, s * (1 + r.v * 0.5), s * 0.6, s * (1.2 - r.v * 0.3), 0, 0, 0, _c.copy(SOLID_STONE).lerp(SOLID_STONE2, r.v), 0, 0, r.v > 0.5 ? 1 : 0)
+    put(b, TPL.rock, 0, 0.1 * s, 0, s * (1 + r.v * 0.5), s * 0.6, s * (1.2 - r.v * 0.3), 0, 0, 0, _c.copy(c1).lerp(c2, r.v), 0, 0, moss)
   }
 }
 
@@ -494,6 +585,8 @@ export function* buildChunkSteps(group: THREE.Group, cx: number, cz: number, q: 
   yield
   const water = waterMesh(cx, cz)
   if (water) group.add(water)
+  const lava = lavaMesh(cx, cz)
+  if (lava) group.add(lava)
   for (const o of fallObjects(cx, cz)) group.add(o)
   yield
   yield* grassStep(cx, cz, q, group)

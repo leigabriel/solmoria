@@ -1,3 +1,4 @@
+import { BIOMES } from '../world/biomes'
 import { useEffect, useRef, useState } from 'react'
 import { playerState, useHud } from '../game/store'
 import { WORLD_HALF, world } from '../world/terrainData'
@@ -166,6 +167,9 @@ function MapView() {
           <span style={{ ['--c' as string]: '#c0562f' }}>Village</span>
           <span style={{ ['--c' as string]: '#ffffff' }}>Waterfall</span>
           <span style={{ ['--c' as string]: '#4a3b2a' }}>Ruins</span>
+          {BIOMES.map((b) => (
+            <span key={b.id} className="bk" style={{ ['--c' as string]: `rgb(${b.map.map((v) => Math.round(v * 255)).join(',')})` }}>{b.name}</span>
+          ))}
         </div>
       </div>
     </div>
