@@ -1,4 +1,4 @@
-# Solmoria roadmap
+# Legend of Lhei roadmap
 
 ## Phase 1 – Exploration Foundation (this branch)
 - Seeded procedural terrain, streamed in chunks around the player

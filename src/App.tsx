@@ -5,6 +5,7 @@ import { NameTag } from './ui/NameTag'
 import { NpcBubble } from './ui/NpcBubble'
 import { Hud } from './ui/Hud'
 import { AttackButtons } from './ui/AttackButtons'
+import { Intro } from './ui/Intro'
 import { useEffect } from 'react'
 import { playerState } from './game/store'
 import { combat } from './combat/state'
@@ -28,6 +29,7 @@ export default function App() {
       <NpcBubble />
       <Hud />
       <div className="mist" />
+      <Intro />
     </>
   )
 }

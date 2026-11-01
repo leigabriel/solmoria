@@ -78,7 +78,11 @@ export function Player() {
 
     // deep water blocks movement, shallows slow you down
     const d0 = depthAt(pos.x, pos.z)
-    const slow = d0 > 0.05 ? 1 - Math.min(0.45, d0 * 0.6) : 1
+    playerState.depth = d0
+    playerState.swim = damp(playerState.swim, d0 > 0.6 ? 1 : 0, 9, dt)
+    if (playerState.swim < 0.003) playerState.swim = 0
+    const swimming = playerState.swim > 0.5
+    const slow = d0 > 0.05 ? 1 - Math.min(swimming ? 0.38 : 0.3, d0 * 0.6) : 1
     const nx = pos.x + vel.x * dt * slow
     const nz = pos.z + vel.z * dt * slow
     // lava is solid ground you can't wade into: block at its edge (a small margin keeps you off the glow)
@@ -89,7 +93,7 @@ export function Player() {
       }
       return false
     }
-    const clearAt = (x: number, z: number) => depthAt(x, z) < 1.0 && !lavaBlocked(x, z)
+    const clearAt = (x: number, z: number) => depthAt(x, z) < 9 && !lavaBlocked(x, z)
     if (clearAt(nx, nz)) {
       pos.x = nx
       pos.z = nz
@@ -101,7 +105,11 @@ export function Player() {
     pos.z = Math.max(-lim, Math.min(lim, pos.z))
     resolveCollisions(pos, PLAYER.radius)
     // vertical: grounded follows the terrain; jump launches with gravity, landing plays a thud
-    const ground = heightAt(pos.x, pos.z)
+    const bed = heightAt(pos.x, pos.z)
+    const dHere = depthAt(pos.x, pos.z)
+    // swimming: float with the head and shoulders above the surface
+    const ground = bed + (dHere > 0.45 ? (dHere - 0.42) * playerState.swim : 0)
+    playerState.waterY = bed + dHere
     if (input.jump > 0) input.jump -= dt
     if (playerState.grounded) {
       if (input.jump > 0) {
@@ -142,6 +150,7 @@ export function Player() {
       state.clock.elapsedTime,
       attacking ? { kind: combat.kind!, step: combat.step, u: combat.u, hitFrom: combat.def.hitFrom, hitTo: combat.def.hitTo } : null,
       playerState.grounded ? 0 : 1,
+      playerState.swim,
     )
     if (speed > 0.9 && !attacking && playerState.grounded && Math.floor(rig.phase / Math.PI) !== prevPhase) {
       audio.step(surfaceAt(pos.x, pos.z), speed > 3.6)

@@ -42,6 +42,12 @@ export const playerState = {
   facing: 0,
   vy: 0,
   grounded: true,
+  /** 0..1 how much the hero is swimming (deep water) */
+  swim: 0,
+  /** world-space water surface under the hero, valid while in water */
+  waterY: 0,
+  /** water depth at the hero's feet */
+  depth: 0,
 }
 
 /** Live biome state (updated every frame by BiomeAtmosphere, read by lights, particles, audio, HUD). */
@@ -116,5 +122,37 @@ export const useHud = create<Hud>((set) => ({
       /* ignore */
     }
     set({ volume })
+  },
+}))
+
+const REALM_KEY = 'lhei.realms'
+function loadRealms(): number[] {
+  try {
+    const v = JSON.parse(localStorage.getItem(REALM_KEY) ?? '[]')
+    if (Array.isArray(v)) return v.filter((n) => Number.isInteger(n) && n >= 0 && n < 10)
+  } catch {
+    /* storage may be unavailable */
+  }
+  return []
+}
+
+/** Story journal: which realms (biomes) the hero has set foot in. */
+interface Journal {
+  found: number[]
+  /** returns true when the realm is new */
+  discover: (biome: number) => boolean
+}
+export const useJournal = create<Journal>((set, get) => ({
+  found: loadRealms(),
+  discover: (biome) => {
+    if (get().found.includes(biome)) return false
+    const found = [...get().found, biome]
+    try {
+      localStorage.setItem(REALM_KEY, JSON.stringify(found))
+    } catch {
+      /* ignore */
+    }
+    set({ found })
+    return true
   },
 }))

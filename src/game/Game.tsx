@@ -8,6 +8,7 @@ import { Pollen } from '../atmosphere/Pollen'
 import { CameraRig } from '../player/CameraRig'
 import { NameTagDriver } from '../ui/NameTag'
 import { Player } from '../player/Player'
+import { SwimFX } from '../player/SwimFX'
 import { NpcBubbleDriver } from '../ui/NpcBubble'
 import { Animals } from '../animals/Animals'
 import { AttackInput } from '../combat/AttackInput'
@@ -37,6 +38,7 @@ export function Game() {
       <Lighting />
       <World />
       <Player />
+      <SwimFX />
       <Animals />
       <AttackInput />
       <CombatFX />

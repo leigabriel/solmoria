@@ -26,7 +26,7 @@ export const PLAYER = {
 export const SUN_DIR = new THREE.Vector3(-0.5, 0.8, -0.3).normalize()
 
 /** Name shown above the player's head. */
-export const PLAYER_NAME = 'solmoria'
+export const PLAYER_NAME = 'Lhei'
 
 export const SKY_COLOR = '#d4e6b4'
 

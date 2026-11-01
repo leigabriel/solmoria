@@ -1,4 +1,4 @@
-# Solmoria
+# Legend of Lhei
 
 A stylised 3D exploration game for the browser, built with React, Three.js and React Three Fiber.
 Visual and gameplay reference: a painterly forest clearing seen from a high-angle follow camera.
@@ -64,6 +64,15 @@ The blade swings toward the mouse pointer. Animals scatter when struck near or r
 
 ## Villages and villagers
 Eight villages are placed on flat dry ground across the map (plaza, well, market stalls, windmill, mushroom houses, thatched cottages, tower houses, hobbit holes). Farmers, elders, merchants, children and guards wander inside them; walk up to one to see a line of dialogue. Press `M` for the world map, `Space` to jump.
+
+## Story and UI
+
+*Legend of Lhei* is set in the land of Solmoria. The Sunseed, a tree of living light, was split into ten shards by the Hollow Night; Lhei, a small samurai, must walk the ten realms (one per biome) and mend it. The full story is in `docs/STORY.md`, the data in `src/story/story.ts`.
+
+- Title screen and three-page prologue on launch (skipped with `?debug`).
+- Menu (top right) has Status, Journal and Settings tabs. The Journal tracks realms discovered; entering a new biome shows a "New realm discovered" banner.
+- Parchment UI kit in `src/ui/rpg.tsx` (panels, name plates, stat rows, bars, icons) with styles in `src/styles.css`; the villager dialogue, bag, menu and map share it.
+- Swimming: in deep water the hero swims (front crawl, floating at the surface) and leaves ripple rings, a foam V-wake and splash droplets (`src/player/SwimFX.tsx`).
 
 ## Biomes
 

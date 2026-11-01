@@ -1,3 +1,4 @@
+import { VILLAGER_LINES } from '../story/story'
 import * as THREE from 'three'
 import { PropBatch } from '../world/propBatch'
 import { TPL } from '../world/templates'
@@ -170,26 +171,26 @@ function villagers() {
     farmer: blobNpc('farmer', [0.96, 0.92, 0.8], (a) => {
       a(['cone', [0, 0.86, 0], [0.34, 0.12, 0.34], [0.93, 0.78, 0.3]])
       a(['box', [0, 0.28, 0.2], [0.3, 0.3, 0.05], [0.4, 0.55, 0.28]])
-    }, { title: 'Farmer', lines: ['The grass is tall this year.', 'Mind the cows, they wander.', 'Fine day for the harvest.'] }),
+    }, { title: 'Farmer', lines: VILLAGER_LINES.farmer }),
     elder: blobNpc('elder', [0.9, 0.9, 0.95], (a) => {
       a(['cone', [0, 0.82, 0], [0.22, 0.55, 0.22], [0.3, 0.32, 0.7]])
       a(['sphere', [0, 0.95, 0], [0.04, 0.04, 0.04], [1, 0.9, 0.4]])
       a(['cone', [0, 0.52, 0.2], [0.1, 0.3, 0.06], [0.97, 0.97, 0.97], [Math.PI, 0, 0]])
-    }, { title: 'Elder', lines: ['Falls to the west sing at night.', 'Old ruins hold old secrets.', 'Walk softly, wanderer.'] }),
+    }, { title: 'Elder', lines: VILLAGER_LINES.elder }),
     merchant: blobNpc('merchant', [0.86, 0.72, 0.52], (a) => {
       a(['sphere', [0, 0.88, 0], [0.22, 0.14, 0.22], [0.8, 0.18, 0.2]])
       a(['sphere', [0.18, 0.3, 0.12], [0.08, 0.09, 0.08], [0.45, 0.3, 0.15]])
-    }, { title: 'Merchant', lines: ['Fine wares, fair prices!', 'Nothing in stock just yet.', 'Come back with coin.'] }),
+    }, { title: 'Merchant', lines: VILLAGER_LINES.merchant }),
     child: blobNpc('child', [0.97, 0.9, 0.88], (a) => {
       a(['sphere', [0.08, 0.9, 0.05], [0.07, 0.05, 0.05], [1, 0.45, 0.6]])
       a(['sphere', [-0.08, 0.9, 0.05], [0.07, 0.05, 0.05], [1, 0.45, 0.6]])
-    }, { title: 'Child', lines: ['Wow, a real sword!', 'Can you chase the chickens?', 'I saw a glowing deer!'] }, 0.95),
+    }, { title: 'Child', lines: VILLAGER_LINES.child }, 0.95),
     guard: blobNpc('guard', [0.72, 0.76, 0.84], (a) => {
       a(['sphere', [0, 0.85, 0], [0.25, 0.17, 0.25], [0.55, 0.57, 0.62]])
       a(['cone', [0, 1.0, -0.05], [0.04, 0.2, 0.04], [0.8, 0.15, 0.15]])
       a(['cyl', [0.32, 0.8, 0.1], [0.018, 1.7, 0.018], [0.4, 0.28, 0.16]])
       a(['cone', [0.32, 1.64, 0.1], [0.04, 0.14, 0.04], [0.85, 0.87, 0.9]])
-    }, { title: 'Guard', lines: ['All quiet in the village.', 'Keep that blade sheathed indoors.', 'Beasts roam beyond the fence.'] }),
+    }, { title: 'Guard', lines: VILLAGER_LINES.guard }),
   }
 }
 

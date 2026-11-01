@@ -352,7 +352,7 @@ function swordPose(rig: CharacterRig, a: AttackPose | null, move: number, phase:
   }
 }
 
-export function animateCharacter(rig: CharacterRig, speed: number, dt: number, time: number, atk?: AttackPose | null, air = 0) {
+export function animateCharacter(rig: CharacterRig, speed: number, dt: number, time: number, atk?: AttackPose | null, air = 0, swim = 0) {
   const move = clamp(speed / 3.4, 0, 1)
   const run = clamp((speed - 2.2) / 3.4, 0, 1)
   const idle = 1 - move
@@ -399,6 +399,29 @@ export function animateCharacter(rig: CharacterRig, speed: number, dt: number, t
     rig.shinR.rotation.x = lerp(rig.shinR.rotation.x, 0.8, air)
     rig.armL.rotation.z = lerp(rig.armL.rotation.z, 1.0, air)
     rig.armL.rotation.x = lerp(rig.armL.rotation.x, -0.3, air)
+  }
+  // swimming: body pitches forward, arms windmill (front crawl), legs flutter, head lifts out of the water
+  const sk = swim > 0.01 ? 1 : 0
+  const pitch = THREE.MathUtils.lerp(rig.body.rotation.x, swim * (0.75 + 0.1 * Math.min(1, speed / 2)), k)
+  rig.body.rotation.x = Math.abs(pitch) < 1e-4 ? 0 : pitch
+  rig.body.position.y = swim * 0.12
+  if (sk) {
+    const sp = time * (3.4 + Math.min(speed, 2.5) * 1.4)
+    const stroke = 0.45 + Math.min(1, speed / 1.6) * 0.55
+    rig.armL.rotation.x = lerp(rig.armL.rotation.x, -(1.2 + Math.sin(sp) * 1.4 * stroke) - 0.9, swim)
+    rig.armR.rotation.x = lerp(rig.armR.rotation.x, -(1.2 + Math.sin(sp + Math.PI) * 1.4 * stroke) - 0.9, swim)
+    rig.armL.rotation.z = lerp(rig.armL.rotation.z, 0.25 + Math.max(0, Math.cos(sp)) * 0.35, swim)
+    rig.armR.rotation.z = lerp(rig.armR.rotation.z, -0.25 - Math.max(0, -Math.cos(sp)) * 0.35, swim)
+    rig.foreL.rotation.x = lerp(rig.foreL.rotation.x, -0.25 - Math.max(0, Math.sin(sp)) * 0.6, swim)
+    rig.foreR.rotation.x = lerp(rig.foreR.rotation.x, -0.25 - Math.max(0, -Math.sin(sp)) * 0.6, swim)
+    rig.thighL.rotation.x = lerp(rig.thighL.rotation.x, Math.sin(sp * 2) * 0.4, swim)
+    rig.thighR.rotation.x = lerp(rig.thighR.rotation.x, -Math.sin(sp * 2) * 0.4, swim)
+    rig.shinL.rotation.x = lerp(rig.shinL.rotation.x, 0.25 + Math.max(0, -Math.sin(sp * 2)) * 0.5, swim)
+    rig.shinR.rotation.x = lerp(rig.shinR.rotation.x, 0.25 + Math.max(0, Math.sin(sp * 2)) * 0.5, swim)
+    rig.torso.rotation.y = lerp(rig.torso.rotation.y, Math.sin(sp) * 0.22, swim)
+    // keep the head up and looking forward against the body pitch
+    rig.head.rotation.x = lerp(rig.head.rotation.x, -rig.body.rotation.x * 0.8 + Math.sin(sp * 2) * 0.03, swim)
+    rig.hips.position.y = lerp(rig.hips.position.y, HIP_Y + Math.sin(sp * 2) * 0.012, swim)
   }
   swordPose(rig, atk ?? null, move, p)
 
