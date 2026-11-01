@@ -99,18 +99,18 @@ The cavern is an open-roof sunken bowl: the terrain is a heightfield, so it cann
 
 There are eight villages, one per biome, each with its own look (`src/world/structures.ts`):
 
-Each biome has its own layout, not just its own palette:
+Each biome is a different Middle-earth-style culture with its own layout, houses, centrepiece, walls and gates (research notes: Tolkien's Shire, Rohan, Gondor, Lake-town, Dwarf-holds and the Elven realms as drawn in the books and Peter Jackson's films):
 
-| Biome | Layout | Houses | Plaza | Wall |
-| --- | --- | --- | --- | --- |
-| Grassland | round plaza, ring road, spokes to three gates | thatch cottages, mushroom houses, towers, hobbit holes, windmill | well | round picket fence |
-| Forest | clearing with winding dirt roads, lumber piles | log cabins | bonfire | lumpy log palisade, two gates |
-| Desert | walled square, two crossing streets | adobe houses fronting the streets | square with oasis | sandstone wall, four domed corner towers, four gates |
-| Snow | compact ring around a fire | A-frame cabins and igloos | bonfire | small snow-capped stone ring |
-| Tropical | one long street through an oval stockade | stilt huts on both sides with boardwalk lanes | totem | bamboo oval, gates at both ends |
-| Swamp | scattered huts joined by plank boardwalks | stilt shacks | mossy well | broken reed fence |
-| Mountain | fortress with a long avenue | two rows of stone chalets, watchtowers | obelisk | tall stone rectangle, corner turrets |
-| Enchanted | hexagon of houses, ring road and six spokes | crystal mushroom houses and spires | crystal fountain | glowing hedge circle |
+| Biome | Culture | Layout | Houses | Centre | Wall and gates |
+| --- | --- | --- | --- | --- | --- |
+| Grassland | The Shire | ring road round a plaza, mill on the edge | hobbit-holes with round coloured doors and white garden fences, thatched farmhouses | the Party Tree with string lanterns | picket fence |
+| Forest | Rohan | palisaded hill-town, long avenue, broad steps up to a terrace | golden-thatched timber halls with crossed horse-head gables, Meduseld on the terrace | standard with a gold sun and green banner | log stockade with log watch-posts, horse-head gate |
+| Desert | Harad | round bazaar | red-and-gold tiered pavilions and sandstone houses | oasis with palms | adobe wall, ivory tusk-arch gates, red banners |
+| Snow | Gondor | ring of white-stone houses | white stone, dark slate roofs, arched doors, tall windows | the White Tree on a stepped terrace with a basin | white ramparts with merlons and buttresses, towered arch gates |
+| Tropical | Lake-town | plank street on piles through an oval stockade | tall pile-dwellings with jettied upper floors, nets, rowing boats; a grand house at one end | harbour market with lantern post | rope rails, pile gates |
+| Swamp | marsh-folk | huts scattered and joined by plank boardwalks | crooked stilt shacks with pale marsh-lights | mossy well | broken reed fence |
+| Mountain | Dwarf-hold | fortress with a long avenue | massive squared stone halls, glowing forge doors, rune bands, keeps | rune-lit brazier column | stone bastion wall, square corner towers, great gate with rune lintel |
+| Enchanted | Elven realm | hexagon with ring road and six spokes | white colonnaded pavilions with copper-green roofs, mallorn flets with rope ladders | white fountain with a golden bowl | golden leaf-hedge, leaf-arch gates, mallorn groves |
 
 Plazas, pools and bases are 32-sided discs and roads are continuous overlapping slabs (no stepping stones, no 8-sided blobs). Walls are short segments that follow the ground, with gates (posts, lintel and lantern). Villagers keep to the village's own walls, only choose spots they can stand on, and turn to face you when you come close.
 

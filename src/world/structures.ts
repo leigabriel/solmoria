@@ -379,6 +379,11 @@ class Frame {
     const [x, z] = this.p(dx, dz)
     this.c.disc(x, this.gy + dy, z, r, h, color, moss, emis)
   }
+  /** round plate standing upright on the local +z face (axis along local z): round doors, shields, suns */
+  wheel(dx: number, dy: number, dz: number, r: number, thick: number, color: RGB, emis = 0) {
+    const [x, z] = this.p(dx, dz)
+    this.c.cyl(x, this.gy + dy, z, r, thick, color, 0, 0, this.Y - Math.PI / 2, Math.PI / 2, emis)
+  }
   /** cylinder lying along local x (a log) */
   log(dx: number, dy: number, dz: number, r: number, len: number, color: RGB, yawOff = 0) {
     const [x, z] = this.p(dx, dz)
@@ -711,6 +716,386 @@ function watchtower(f: Frame) {
   f.col(0, 0, 1.9)
 }
 
+// ---- Middle-earth builders: Shire, Rohan, Harad, Gondor, Lake-town, Dwarf-hold, Elven realm ----
+const GOLD_THATCH: RGB = [0.84, 0.69, 0.3]
+const ROHAN_GREEN: RGB = [0.2, 0.42, 0.24]
+const WHITE_STONE: RGB = [0.88, 0.88, 0.85]
+const WHITE_STONE2: RGB = [0.78, 0.79, 0.8]
+const SLATE_BLUE: RGB = [0.24, 0.3, 0.42]
+const DWARF_STONE: RGB = [0.44, 0.44, 0.47]
+const DWARF_STONE2: RGB = [0.34, 0.34, 0.38]
+const FORGE: RGB = [1, 0.5, 0.15]
+const MALLORN_GOLD: RGB = [0.92, 0.76, 0.26]
+const ELF_WHITE: RGB = [0.93, 0.93, 0.88]
+const ELF_COPPER: RGB = [0.36, 0.62, 0.5]
+const DOORS: RGB[] = [[0.2, 0.5, 0.3], [0.7, 0.2, 0.18], [0.9, 0.7, 0.2], [0.2, 0.4, 0.65], [0.5, 0.3, 0.6]]
+const IVORY: RGB = [0.93, 0.9, 0.78]
+
+/** Same frame raised by dy (for doors and details on decks and platforms). */
+function lifted(f: Frame, dy: number): Frame {
+  const g = new Frame(f.c, f.wx, f.wz, f.Y)
+  g.gy = f.gy + dy
+  return g
+}
+
+// --- The Shire -------------------------------------------------------------------------------
+/** Hobbit-hole: a grassy hill with a round coloured door, round windows, a chimney and a white garden fence. */
+function shireHole(f: Frame, rng: () => number) {
+  const door = pickOf(rng, DOORS)
+  f.sphere(0, -0.05, 0, 3.1, 2.1, 3.1, GRASSY, 1)
+  f.sphere(-2.1, -0.05, -1.3, 1.7, 1.2, 1.7, [0.34, 0.56, 0.22], 1)
+  f.wheel(0, 1.0, 2.5, 1.08, 0.5, WOOD_DARK)
+  f.wheel(0, 1.0, 2.66, 0.88, 0.3, door)
+  f.sphere(0.45, 1.0, 2.84, 0.08, 0.08, 0.06, [0.95, 0.8, 0.3], 0, 0.9)
+  f.wheel(-1.9, 1.15, 1.72, 0.38, 0.3, WOOD)
+  f.wheel(-1.9, 1.15, 1.84, 0.28, 0.3, GLOW, 1.4)
+  f.wheel(1.9, 1.15, 1.72, 0.38, 0.3, WOOD)
+  f.wheel(1.9, 1.15, 1.84, 0.28, 0.3, GLOW, 1.4)
+  f.cyl(1.1, 2.4, -0.9, 0.3, 1.0, [0.58, 0.52, 0.45])
+  const pale: RGB = [0.88, 0.84, 0.72]
+  for (const s of [-1, 1]) {
+    f.box(s * 2.3, 0.34, 4.0, 2.2, 0.07, 0.06, pale)
+    f.box(s * 2.3, 0.18, 4.0, 2.2, 0.07, 0.06, pale)
+    for (let k = 0; k < 3; k++) f.box(s * (1.3 + k * 1.0), 0.28, 4.0, 0.09, 0.56, 0.09, pale)
+  }
+  f.cyl(-1.6, 0.5, 3.1, 0.04, 1.0, WOOD)
+  f.box(-1.6, 1.1, 3.1, 0.3, 0.22, 0.22, door)
+  for (let i = 0; i < 5; i++) {
+    const cols: RGB[] = [[1, 0.5, 0.6], [1, 0.9, 0.3], [0.75, 0.6, 1]]
+    f.sphere(1.2 + i * 0.28, 0.12, 3.5 + (i % 2) * 0.2, 0.1, 0.1, 0.1, cols[i % 3], 0, 0.3)
+  }
+  f.col(0, 0, 2.7)
+}
+
+/** The Party Tree: a huge oak with string lanterns and a picnic table. */
+function partyTree(f: Frame) {
+  f.disc(0, 0.1, 0, 2.2, 0.2, [0.5, 0.45, 0.35])
+  f.cyl(0, 2.2, 0, 0.75, 4.4, [0.4, 0.3, 0.2])
+  for (let i = 0; i < 4; i++) {
+    const a = (i / 4) * Math.PI * 2 + 0.4
+    f.cone(Math.cos(a) * 0.8, 0, Math.sin(a) * 0.8, 0.4, 1.0, [0.4, 0.3, 0.2])
+  }
+  f.sphere(0, 4.3, 0, 3.9, 2.7, 3.9, [0.3, 0.55, 0.2])
+  f.sphere(1.7, 4.8, -0.8, 2.4, 1.8, 2.4, [0.36, 0.6, 0.24])
+  f.sphere(-1.8, 4.6, 0.9, 2.2, 1.6, 2.2, [0.28, 0.5, 0.2])
+  for (let i = 0; i < 9; i++) {
+    const a = (i / 9) * Math.PI * 2
+    f.sphere(Math.cos(a) * 3.0, 3.7 + (i % 2) * 0.3, Math.sin(a) * 3.0, 0.14, 0.18, 0.14, [1, 0.8, 0.4], 0, 1.7)
+  }
+  f.box(2.2, 0.75, 1.2, 1.9, 0.1, 0.75, WOOD)
+  for (const s of [-1, 1]) f.box(2.2 + s * 0.75, 0.38, 1.2, 0.1, 0.76, 0.6, WOOD_DARK)
+  f.col(0, 0, 1.0)
+}
+
+// --- Rohan -----------------------------------------------------------------------------------
+/** Long timber hall with steep golden thatch and crossed horse-head gable beams. `grand` is Meduseld. */
+function rohanHall(f: Frame, rng: () => number, grand = false) {
+  const W = grand ? 5.6 : 3.6
+  const D = grand ? 8.4 : 5.4
+  const H = grand ? 2.8 : 2.0
+  const rise = grand ? 3.3 : 2.3
+  const wall: RGB = [0.42, 0.34, 0.27]
+  const thatch: RGB = grand ? GOLD_THATCH : pickOf(rng, [[0.74, 0.62, 0.32], [0.66, 0.55, 0.3], [0.78, 0.66, 0.34]] as RGB[])
+  f.footing(W + 0.3, D + 0.3, [0.5, 0.48, 0.44], 0.35)
+  f.box(0, 0.35 + H / 2, 0, W, H, D, wall)
+  for (let i = 0; i <= 4; i++) for (const s of [-1, 1]) f.box(s * (W / 2 + 0.04), 0.35 + H / 2, -D / 2 + (i / 4) * D, 0.16, H, 0.16, WOOD_DARK)
+  const y0 = 0.35 + H
+  gable(f, W, D, y0, thatch, wall, rise, 0.85, WOOD_DARK)
+  // lower eave band so the thatch looks thick
+  for (const s of [-1, 1]) f.box(s * (W / 2 + 0.7), y0 + 0.12, 0, 0.3, 0.3, D + 0.9, [thatch[0] * 0.8, thatch[1] * 0.8, thatch[2] * 0.8])
+  // crossed beams ending in horse heads
+  const yt = y0 + rise + 0.15
+  for (const z of [D / 2 + 0.55, -D / 2 - 0.55]) {
+    f.box(0, yt, z, 2.0, 0.14, 0.14, WOOD_DARK, 0, 0.75)
+    f.box(0, yt, z, 2.0, 0.14, 0.14, WOOD_DARK, 0, -0.75)
+    for (const s of [-1, 1]) f.box(s * 0.73, yt + 0.72, z, 0.2, 0.34, 0.14, [0.6, 0.46, 0.3])
+  }
+  f.door(D / 2 + 0.02, grand ? 1.5 : 0.95, grand ? 2.3 : 1.65, [0.72, 0.56, 0.2])
+  for (const s of [-1, 1]) {
+    f.window(s * (W / 2 - 0.85), 0.35 + H * 0.6, D / 2 + 0.03, 0.34, 0.4, WOOD_DARK)
+    f.wheel(s * (W / 2 - 0.5), 0.35 + H * 0.3, D / 2 + 0.06, 0.3, 0.08, s > 0 ? [0.72, 0.2, 0.18] : [0.9, 0.78, 0.3])
+  }
+  // carved porch posts with rearing-horse tops
+  for (const s of [-1, 1]) {
+    const px = s * (grand ? 1.7 : 1.0)
+    f.cyl(px, 1.4, D / 2 + 0.75, 0.14, grand ? 3.2 : 2.6, WOOD_DARK)
+    f.box(px, (grand ? 3.2 : 2.6) + 0.1, D / 2 + 0.75, 0.2, 0.34, 0.14, [0.6, 0.46, 0.3])
+  }
+  f.box(0, grand ? 3.0 : 2.5, D / 2 + 0.75, grand ? 3.8 : 2.4, 0.12, 0.2, WOOD_DARK)
+  if (grand) {
+    f.wheel(0, y0 + 0.7, D / 2 + 0.08, 0.8, 0.1, [0.95, 0.78, 0.25], 0.9)
+    for (const s of [-1, 1]) f.cyl(s * 1.7, 0.18, D / 2 + 0.75, 0.26, 0.36, [0.6, 0.58, 0.54])
+  }
+  f.col(0, -D / 4, W * 0.62)
+  f.col(0, D / 4, W * 0.62)
+  if (grand) f.col(0, 0, W * 0.62)
+}
+
+/** Standard of the Mark: a tall pole with a gold sun disc and a green banner. */
+function rohanStandard(f: Frame) {
+  f.disc(0, 0.25, 0, 1.5, 0.5, [0.58, 0.56, 0.52])
+  f.disc(0, 0.6, 0, 1.0, 0.25, [0.5, 0.48, 0.45])
+  f.cyl(0, 3.4, 0, 0.13, 5.8, WOOD_DARK)
+  f.wheel(0, 5.6, 0.18, 0.5, 0.08, [0.95, 0.78, 0.25], 1.0)
+  f.box(0.7, 4.2, 0, 1.3, 1.9, 0.05, ROHAN_GREEN)
+  f.box(0.7, 4.3, 0.04, 0.5, 0.5, 0.04, [0.92, 0.9, 0.82])
+  f.box(0.7, 3.2, 0, 1.3, 0.08, 0.06, [0.9, 0.75, 0.25])
+  f.col(0, 0, 1.5)
+}
+
+// --- Harad -----------------------------------------------------------------------------------
+/** Tiered pavilion in red and gold with a carpeted entrance. */
+function pavilion(f: Frame, rng: () => number) {
+  const a = pickOf(rng, [[0.72, 0.16, 0.13], [0.55, 0.15, 0.3], [0.7, 0.4, 0.1]] as RGB[])
+  const gold: RGB = [0.9, 0.7, 0.2]
+  f.disc(0, 0.06, 0, 3.3, 0.12, [0.6, 0.3, 0.2])
+  f.disc(0, 0.8, 0, 2.5, 1.5, [0.94, 0.86, 0.62])
+  f.cone(0, 1.5, 0, 3.2, 1.3, a)
+  f.cone(0, 2.5, 0, 2.1, 1.4, gold)
+  f.cone(0, 3.5, 0, 1.2, 1.3, a)
+  f.cyl(0, 5.3, 0, 0.05, 1.2, WOOD_DARK)
+  f.sphere(0, 5.95, 0, 0.16, 0.16, 0.16, gold, 0, 1.0)
+  f.box(0, 0.9, 2.46, 1.3, 1.6, 0.1, [0.16, 0.09, 0.07])
+  f.box(0, 1.8, 2.5, 1.8, 0.2, 0.2, a, 0, 0.3)
+  f.sphere(0.4, 0.9, 2.55, 0.06, 0.06, 0.04, GLOW, 0, 1.4)
+  f.box(0, 0.04, 3.5, 1.7, 0.06, 1.5, a)
+  for (const s of [-1, 1]) f.sphere(s * 1.7, 0.2, 3.4, 0.28, 0.2, 0.28, gold)
+  for (const s of [-1, 1]) f.box(s * 1.0, 0.9, 2.5, 0.05, 1.7, 0.05, WOOD_DARK)
+  f.col(0, 0, 3.0)
+}
+
+// --- Gondor ----------------------------------------------------------------------------------
+/** White-stone house with dark slate roof, arched door and tall windows; sometimes a slim tower. */
+function gondorHouse(f: Frame, rng: () => number) {
+  const W = 3.8 + rng() * 0.6
+  const D = 3.6 + rng() * 0.5
+  const tall = rng() < 0.45
+  const H = tall ? 4.6 : 3.0
+  f.footing(W + 0.4, D + 0.4, WHITE_STONE2, 0.35)
+  const n = Math.round(H / 0.5)
+  for (let i = 0; i < n; i++) {
+    const k = i % 2 ? 0.97 : 1
+    f.box(0, 0.1 + ((i + 0.5) * H) / n, 0, W, H / n + 0.02, D, [WHITE_STONE[0] * k, WHITE_STONE[1] * k, WHITE_STONE[2] * k])
+  }
+  f.box(0, H + 0.2, 0, W + 0.5, 0.25, D + 0.5, WHITE_STONE2)
+  gable(f, W + 0.2, D + 0.2, H + 0.32, SLATE_BLUE, WHITE_STONE, tall ? 2.4 : 1.6, 0.35, [0.18, 0.2, 0.28])
+  for (const s of [-1, 1]) f.box(s * (W / 2), H / 2 + 0.1, D / 2, 0.4, H, 0.4, WHITE_STONE2)
+  const dark: RGB = [0.13, 0.15, 0.2]
+  f.box(0, 0.95, D / 2 + 0.02, 1.0, 1.8, 0.14, dark)
+  f.sphere(0, 1.85, D / 2 + 0.02, 0.5, 0.36, 0.1, dark)
+  for (const s of [-1, 1]) f.box(s * 0.62, 1.0, D / 2 + 0.05, 0.16, 2.0, 0.14, WHITE_STONE2)
+  f.sphere(0, 2.1, D / 2 + 0.05, 0.7, 0.2, 0.1, WHITE_STONE2)
+  for (const s of [-1, 1]) f.window(s * (W / 2 - 0.9), 1.7 + (tall ? 0.2 : 0), D / 2 + 0.03, 0.32, 0.7, WHITE_STONE2)
+  if (tall) for (const s of [-1, 1]) f.window(s * (W / 2 - 0.9), 3.7, D / 2 + 0.03, 0.32, 0.6, WHITE_STONE2)
+  f.box(W / 2 - 0.5, H + 1.9, -0.6, 0.6, 1.4, 0.6, WHITE_STONE2)
+  f.box(0, H + 0.45, 0, W + 0.3, 0.1, D + 0.3, [0.97, 0.98, 1.0])
+  f.col(-W / 4, 0, Math.max(D, W) * 0.42)
+  f.col(W / 4, 0, Math.max(D, W) * 0.42)
+}
+
+/** The White Tree of Gondor on a stepped white terrace with a basin. */
+function whiteTree(f: Frame) {
+  f.disc(0, 0.45, 0, 3.4, 0.3, WHITE_STONE)
+  f.disc(0, 0.75, 0, 2.5, 0.3, WHITE_STONE2)
+  f.disc(0, 1.0, 0, 1.6, 0.3, WHITE_STONE)
+  f.disc(0, 1.18, 0, 1.3, 0.08, [0.4, 0.65, 0.85], 0.6)
+  const bark: RGB = [0.8, 0.78, 0.74]
+  f.cyl(0, 2.4, 0, 0.26, 2.6, bark)
+  for (let i = 0; i < 5; i++) {
+    const a = (i / 5) * Math.PI * 2
+    f.cone(Math.cos(a) * 0.55, 3.0 + (i % 2) * 0.3, Math.sin(a) * 0.55, 0.12, 1.5, bark)
+  }
+  for (let i = 0; i < 16; i++) {
+    const a = i * 2.4
+    const r = 0.3 + (i % 5) * 0.34
+    f.sphere(Math.cos(a) * r, 3.9 + (i % 4) * 0.35, Math.sin(a) * r, 0.3, 0.2, 0.3, [0.97, 0.98, 1.0], 0, 0.7)
+  }
+  f.col(0, 0, 1.7)
+}
+
+// --- Lake-town -------------------------------------------------------------------------------
+/** Tall pile-dwelling: stilts and braces, jettied upper storey, steep shingle roof, nets and a rowing boat. */
+function lakeHouse(f: Frame, rng: () => number, grand = false) {
+  const W = grand ? 4.8 : 3.0 + rng() * 0.4
+  const D = grand ? 5.2 : 3.4 + rng() * 0.4
+  const PH = 1.1
+  const plank: RGB = [0.5, 0.38, 0.26]
+  const dark: RGB = [0.34, 0.26, 0.19]
+  const wall: RGB = pickOf(rng, [[0.62, 0.5, 0.36], [0.55, 0.46, 0.4], [0.5, 0.52, 0.48]] as RGB[])
+  const trim: RGB = pickOf(rng, [[0.7, 0.25, 0.2], [0.2, 0.5, 0.55], [0.82, 0.62, 0.2]] as RGB[])
+  for (const sx of [-1, 1]) for (const sz of [-1, 0, 1]) f.cyl(sx * (W / 2 - 0.1), PH / 2 - 0.5, sz * (D / 2 - 0.1), 0.14, PH + 1.0, dark, 0, 1)
+  for (const sz of [-1, 1]) f.box(0, 0.45, sz * (D / 2 - 0.1), W - 0.2, 0.08, 0.08, dark)
+  f.box(0, PH, 0, W + 0.9, 0.16, D + 0.9, plank)
+  f.box(0, PH + 0.9, 0, W, 1.7, D, wall)
+  f.box(0, PH + 2.35, 0, W + 0.5, 1.3, D + 0.4, wall)
+  for (const x of [-W / 2, 0, W / 2]) f.box(x, PH + 0.9, D / 2 + 0.02, 0.1, 1.7, 0.08, dark)
+  for (const x of [-W / 2 - 0.2, W / 2 + 0.2]) f.box(x, PH + 2.35, D / 2 + 0.22, 0.1, 1.3, 0.08, dark)
+  gable(f, W + 0.5, D + 0.4, PH + 3.0, [0.3, 0.25, 0.24], wall, grand ? 2.4 : 2.0, 0.5, dark)
+  const g = lifted(f, PH + 0.08)
+  g.door(D / 2 + 0.03, 0.8, 1.5, trim)
+  f.window(-W / 2 + 0.6, PH + 2.3, D / 2 + 0.25, 0.36, 0.5, trim)
+  f.window(W / 2 - 0.6, PH + 2.3, D / 2 + 0.25, 0.36, 0.5, trim)
+  f.box(W / 2 + 0.35, PH + 1.8, D / 2 + 0.45, 0.6, 0.05, 0.05, dark)
+  f.sphere(W / 2 + 0.55, PH + 1.55, D / 2 + 0.45, 0.13, 0.17, 0.13, [1, 0.75, 0.3], 0, 1.8)
+  f.box(-W / 2 - 0.5, PH + 1.3, 0.2, 0.05, 1.2, 1.7, [0.72, 0.68, 0.56])
+  f.cyl(W / 2 + 0.2, PH + 0.5, -D / 2 - 0.1, 0.3, 0.8, plank)
+  f.box(-0.8, PH + 0.3, D / 2 + 0.4, 0.5, 0.5, 0.5, plank)
+  for (let i = 0; i < 3; i++) f.box(0, 0.14 + i * (PH / 3), D / 2 + 1.5 - i * 0.28, 1.2, 0.1, 0.4, plank)
+  if (!grand) {
+    f.box(-W / 2 - 1.5, 0.1, -0.6, 0.8, 0.22, 2.6, dark)
+    f.box(-W / 2 - 1.5, 0.3, 0.9, 0.7, 0.2, 0.5, dark, 0, 0.5)
+    f.box(-W / 2 - 1.5, 0.3, -2.1, 0.7, 0.2, 0.5, dark, 0, -0.5)
+  } else {
+    f.box(W / 4, PH + 4.3, -0.8, 0.7, 1.6, 0.7, [0.55, 0.5, 0.45])
+    f.box(-W / 4, PH + 4.3, -0.8, 0.7, 1.6, 0.7, [0.55, 0.5, 0.45])
+  }
+  f.col(0, 0, Math.max(W, D) * 0.58)
+}
+
+/** Harbour market: a plank deck, a lantern post with nets, crates and barrels. */
+function pierMarket(f: Frame) {
+  f.disc(0, 0.14, 0, 3.2, 0.24, [0.5, 0.38, 0.26])
+  f.cyl(0, 2.2, 0, 0.14, 4.0, WOOD_DARK)
+  f.box(0, 3.8, 0, 2.6, 0.1, 0.1, WOOD_DARK)
+  for (const x of [-1.2, 0, 1.2]) f.sphere(x, 3.5, 0, 0.14, 0.2, 0.14, [1, 0.75, 0.3], 0, 1.8)
+  f.box(0.6, 2.4, 0.1, 0.05, 1.3, 1.2, [0.72, 0.68, 0.56])
+  f.box(1.7, 0.6, 0.9, 0.7, 0.6, 0.7, WOOD)
+  f.box(1.55, 1.15, 0.8, 0.5, 0.45, 0.5, WOOD_DARK)
+  f.cyl(-1.6, 0.7, 1.0, 0.32, 0.8, WOOD)
+  f.cyl(-1.0, 0.65, 1.6, 0.28, 0.7, WOOD_DARK)
+  f.col(0, 0, 1.0)
+}
+
+/** Marsh stilt-house with pale marsh-lights hung under the eaves. */
+function marshHouse(f: Frame, rng: () => number) {
+  stiltHut(f, rng, true)
+  for (let i = 0; i < 3; i++) f.sphere(-1.1 + i * 1.1, 1.3 - (i % 2) * 0.2, 1.9, 0.09, 0.12, 0.09, [0.6, 1, 0.55], 0, 1.8)
+  for (let i = 0; i < 3; i++) f.cone(2.2 + i * 0.2, 0, -0.8 + i * 0.5, 0.2, 1.5 + i * 0.3, [0.45, 0.5, 0.24], 0.5)
+}
+
+// --- Dwarf-hold ------------------------------------------------------------------------------
+/** Squat stone hall: massive courses, square-pillared porch, a glowing forge door, rune band, tall chimney. */
+function dwarfHall(f: Frame, rng: () => number) {
+  const W = 4.6 + rng() * 0.6
+  const D = 4.0 + rng() * 0.5
+  const H = 2.8 + (rng() < 0.4 ? 0.8 : 0)
+  f.footing(W + 0.5, D + 0.5, DWARF_STONE2, 0.4)
+  for (let i = 0; i < 6; i++) f.box(0, 0.3 + (i + 0.5) * (H / 6), 0, W, H / 6 + 0.02, D, i % 2 ? DWARF_STONE : DWARF_STONE2)
+  f.box(0, H + 0.5, 0, W + 0.7, 0.4, D + 0.7, DWARF_STONE2)
+  f.box(0, H + 0.85, 0, W - 0.3, 0.3, D - 0.3, DWARF_STONE)
+  for (const s of [-1, 1]) {
+    f.box(s * 1.45, H / 2 + 0.3, D / 2 + 0.55, 0.7, H, 0.7, DWARF_STONE)
+    f.box(s * 1.45, H + 0.4, D / 2 + 0.55, 0.98, 0.25, 0.98, DWARF_STONE2)
+  }
+  f.box(0, H + 0.4, D / 2 + 0.55, 3.9, 0.3, 0.9, DWARF_STONE2)
+  f.box(0, 1.15, D / 2 + 0.02, 1.5, 2.1, 0.14, [0.1, 0.08, 0.07])
+  f.box(0, 0.95, D / 2 + 0.1, 1.1, 1.5, 0.06, FORGE, 1.0)
+  f.box(0, 2.3, D / 2 + 0.05, 1.9, 0.3, 0.16, DWARF_STONE2)
+  for (let i = 0; i < 5; i++) f.box(-0.8 + i * 0.4, H - 0.3, D / 2 + 0.05, 0.12, 0.3, 0.05, [1, 0.7, 0.3], 1.4)
+  f.box(W / 2 - 0.6, H + 2.0, -0.6, 0.8, 2.4, 0.8, DWARF_STONE2)
+  f.sphere(W / 2 - 0.6, H + 3.3, -0.6, 0.3, 0.2, 0.3, FORGE, 0, 1.6)
+  f.box(-W / 2 - 0.9, 0.6, D / 2 - 0.4, 0.5, 0.3, 0.8, [0.22, 0.22, 0.26])
+  f.box(-W / 2 - 0.9, 0.25, D / 2 - 0.4, 0.3, 0.5, 0.3, WOOD_DARK)
+  f.col(-W / 4, 0, Math.max(D, W) * 0.45)
+  f.col(W / 4, 0, Math.max(D, W) * 0.45)
+}
+
+/** Square keep with a glowing arrow slit and a brazier on the roof. */
+function dwarfKeep(f: Frame) {
+  f.footing(3.6, 3.6, DWARF_STONE2, 0.4)
+  for (let i = 0; i < 8; i++) f.box(0, 0.5 + i * 0.8, 0, 3.0 - i * 0.03, 0.82, 3.0 - i * 0.03, i % 2 ? DWARF_STONE : DWARF_STONE2)
+  f.box(0, 6.9, 0, 3.8, 0.5, 3.8, DWARF_STONE2)
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) f.box(sx * 1.6, 7.45, sz * 1.6, 0.6, 0.6, 0.6, DWARF_STONE)
+  f.box(0, 4.0, 1.52, 0.2, 0.8, 0.05, FORGE, 1.4)
+  f.box(0, 2.4, 1.52, 0.2, 0.8, 0.05, FORGE, 1.4)
+  f.door(1.5, 0.9, 1.5, DWARF_STONE2)
+  f.cone(0, 7.2, 0, 0.5, 1.0, FORGE, 0, 2.2)
+  f.col(0, 0, 2.1)
+}
+
+/** Great brazier column with a rune-lit shaft. */
+function dwarfMonument(f: Frame) {
+  f.box(0, 0.25, 0, 3.2, 0.5, 3.2, DWARF_STONE2)
+  f.box(0, 0.65, 0, 2.4, 0.3, 2.4, DWARF_STONE)
+  f.box(0, 3.0, 0, 1.1, 4.6, 1.1, DWARF_STONE)
+  f.box(0, 5.45, 0, 1.5, 0.4, 1.5, DWARF_STONE2)
+  f.disc(0, 5.85, 0, 1.1, 0.4, [0.2, 0.2, 0.22])
+  f.cone(0, 6.0, 0, 0.7, 1.4, FORGE, 0, 2.2)
+  f.cone(0, 6.2, 0, 0.4, 1.8, [1, 0.85, 0.4], 0, 2.4)
+  for (let i = 0; i < 5; i++) f.box(0, 1.4 + i * 0.6, 0.57, 0.5, 0.12, 0.04, [1, 0.65, 0.25], 1.4)
+  f.col(0, 0, 2.0)
+}
+
+// --- Elven realm -----------------------------------------------------------------------------
+/** Rivendell-style pavilion: white colonnade, copper-green flared roof, round gold window, hanging lamps. */
+function elvenPavilion(f: Frame, rng: () => number) {
+  void rng
+  f.disc(0, 0.2, 0, 3.0, 0.4, ELF_WHITE)
+  for (let i = 0; i < 8; i++) {
+    const a = (i / 8) * Math.PI * 2
+    if (Math.abs(Math.sin(a) - 1) < 0.2) continue
+    f.cyl(Math.cos(a) * 2.3, 1.9, Math.sin(a) * 2.3, 0.1, 3.0, ELF_WHITE)
+  }
+  for (const s of [-1, 1]) f.cyl(s * 0.95, 1.9, 2.45, 0.1, 3.0, ELF_WHITE)
+  f.disc(0, 3.5, 0, 2.6, 0.2, ELF_WHITE)
+  f.cone(0, 3.6, 0, 3.4, 1.7, ELF_COPPER)
+  f.cone(0, 4.9, 0, 1.6, 1.3, [0.42, 0.7, 0.55])
+  f.cone(0, 5.9, 0, 0.5, 1.3, MALLORN_GOLD, 0, 0.6)
+  f.sphere(0, 7.2, 0, 0.15, 0.15, 0.15, [1, 0.95, 0.7], 0, 1.8)
+  f.box(0, 1.6, -1.9, 3.2, 2.4, 0.12, ELF_WHITE)
+  f.wheel(0, 2.1, -1.8, 0.72, 0.1, MALLORN_GOLD, 0.4)
+  f.wheel(0, 2.1, -1.76, 0.56, 0.1, [1, 0.95, 0.7], 1.2)
+  for (const s of [-1, 1]) f.sphere(s * 1.2, 3.1, 2.2, 0.13, 0.2, 0.13, [0.7, 1, 0.6], 0, 1.8)
+  f.box(0, 0.12, 3.15, 1.8, 0.2, 0.7, ELF_WHITE)
+  f.box(-1.2, 0.65, -1.2, 1.0, 0.1, 0.4, [0.8, 0.7, 0.5])
+  f.col(0, 0, 3.0)
+}
+
+/** Mallorn: silver-grey trunk, golden crown. */
+function mallornTree(f: Frame, h = 7.5, spread = 1) {
+  f.cyl(0, h / 2, 0, 0.55 * spread, h, [0.64, 0.62, 0.57])
+  for (let i = 0; i < 3; i++) {
+    const a = (i / 3) * Math.PI * 2 + 0.5
+    f.cone(Math.cos(a) * 0.5 * spread, 0, Math.sin(a) * 0.5 * spread, 0.35, 1.2, [0.64, 0.62, 0.57])
+  }
+  f.sphere(0, h - 0.3, 0, 1.9 * spread, 1.5, 1.9 * spread, MALLORN_GOLD, 0, 0.25)
+  f.sphere(0.8 * spread, h + 0.5, -0.5 * spread, 1.2 * spread, 1.1, 1.2 * spread, [0.95, 0.8, 0.3], 0, 0.3)
+  f.sphere(-0.9 * spread, h + 0.2, 0.6 * spread, 1.1 * spread, 1.0, 1.1 * spread, [0.88, 0.72, 0.24], 0, 0.2)
+  f.col(0, 0, 0.9)
+}
+
+/** A mallorn with a flet: an open wooden platform around the trunk, a canopy cloth, lanterns and a rope ladder. */
+function mallornFlet(f: Frame, rng: () => number) {
+  void rng
+  mallornTree(f, 8.4, 0.95)
+  const y = 3.6
+  f.disc(0, y, 0, 2.3, 0.22, [0.82, 0.72, 0.52])
+  f.disc(0, y - 0.3, 0, 1.2, 0.4, [0.6, 0.58, 0.52])
+  for (let i = 0; i < 4; i++) {
+    const a = (i / 4) * Math.PI * 2 + Math.PI / 4
+    f.cyl(Math.cos(a) * 1.9, y + 0.9, Math.sin(a) * 1.9, 0.06, 1.8, ELF_WHITE)
+    f.sphere(Math.cos(a) * 1.9, y + 1.5, Math.sin(a) * 1.9, 0.12, 0.18, 0.12, [0.7, 1, 0.6], 0, 1.8)
+  }
+  f.disc(0, y + 1.9, 0, 2.2, 0.08, [0.9, 0.95, 0.8])
+  for (const s of [-1, 1]) f.cyl(s * 0.25, y / 2, 2.15, 0.025, y, [0.85, 0.8, 0.65])
+  for (let i = 0; i < 8; i++) f.box(0, 0.35 + i * 0.4, 2.15, 0.5, 0.04, 0.04, [0.5, 0.4, 0.28])
+  f.col(0, 0, 0.9)
+}
+
+/** White basin with slender leaf-like spires and a golden bowl. */
+function elvenFountain(f: Frame) {
+  f.disc(0, 0.3, 0, 2.4, 0.6, ELF_WHITE)
+  f.disc(0, 0.62, 0, 2.0, 0.06, [0.4, 0.75, 0.8], 0.8)
+  f.disc(0, 1.0, 0, 0.6, 1.2, ELF_WHITE)
+  for (let i = 0; i < 3; i++) {
+    const a = (i / 3) * Math.PI * 2
+    f.cone(Math.cos(a) * 0.3, 1.5, Math.sin(a) * 0.3, 0.16, 2.4 + i * 0.3, ELF_WHITE, 0, 0.2)
+  }
+  f.disc(0, 1.7, 0, 1.0, 0.12, MALLORN_GOLD, 0.3)
+  f.sphere(0, 4.0, 0, 0.2, 0.3, 0.2, [1, 0.95, 0.7], 0, 1.8)
+  f.col(0, 0, 2.3)
+}
+
 // ---- plaza centrepieces + small props --------------------------------------------------------
 function well(f: Frame, moss = 0) {
   f.disc(0, 0.45, 0, 1.15, 0.9, [0.62, 0.58, 0.5], 0, moss)
@@ -795,8 +1180,26 @@ function obelisk(f: Frame) {
   f.col(0, 0, 1.3)
 }
 
-function lamp(f: Frame, kind: 'post' | 'torch' | 'crystal' | 'lantern' = 'post', tint: RGB = [1.0, 0.82, 0.4]) {
-  if (kind === 'torch') {
+function lamp(f: Frame, kind: 'post' | 'torch' | 'crystal' | 'lantern' | 'banner' | 'brazier' | 'white' | 'elven' = 'post', tint: RGB = [1.0, 0.82, 0.4]) {
+  if (kind === 'banner') {
+    f.cyl(0, 1.7, 0, 0.06, 3.4, WOOD_DARK)
+    f.box(0.32, 3.25, 0, 0.7, 0.06, 0.06, WOOD_DARK)
+    f.box(0.35, 2.6, 0, 0.62, 1.2, 0.04, tint)
+    f.box(0.35, 2.65, 0.03, 0.22, 0.24, 0.03, [0.95, 0.92, 0.8])
+    f.box(0.35, 1.98, 0, 0.62, 0.06, 0.05, [0.9, 0.75, 0.25])
+  } else if (kind === 'brazier') {
+    f.box(0, 0.5, 0, 0.5, 1.0, 0.5, DWARF_STONE)
+    f.disc(0, 1.05, 0, 0.4, 0.16, [0.2, 0.2, 0.22])
+    f.cone(0, 1.1, 0, 0.28, 0.7, FORGE, 0, 2.2)
+  } else if (kind === 'white') {
+    f.cyl(0, 1.0, 0, 0.07, 2.0, WHITE_STONE2)
+    f.box(0, 2.15, 0, 0.34, 0.4, 0.34, [1, 0.95, 0.8], 1.8)
+    f.cone(0, 2.35, 0, 0.3, 0.25, SLATE_BLUE)
+  } else if (kind === 'elven') {
+    f.cyl(0, 1.1, 0, 0.05, 2.2, ELF_WHITE)
+    f.box(0.15, 2.05, 0, 0.35, 0.04, 0.04, ELF_WHITE)
+    f.sphere(0.3, 1.85, 0, 0.17, 0.25, 0.17, tint, 0, 1.9)
+  } else if (kind === 'torch') {
     f.cyl(0, 0.9, 0, 0.07, 1.8, WOOD)
     f.cyl(0, 1.85, 0, 0.16, 0.2, WOOD_DARK)
     f.cone(0, 1.9, 0, 0.18, 0.5, [1, 0.6, 0.15], 0, 2.0)
@@ -827,7 +1230,7 @@ function stall(f: Frame, rng: () => number, cloth?: RGB[]) {
 }
 
 // ---- fences and walls ------------------------------------------------------------------------
-type FenceKind = 'picket' | 'palisade' | 'stone' | 'adobe' | 'bamboo' | 'reed' | 'hedge' | 'snowstone'
+type FenceKind = 'picket' | 'palisade' | 'stone' | 'adobe' | 'bamboo' | 'reed' | 'hedge' | 'snowstone' | 'rail' | 'rampart' | 'bastion' | 'leafhedge'
 interface Seg { c: Ctx; x0: number; z0: number; x1: number; z1: number; mx: number; mz: number; len: number; yaw: number; g0: number; g1: number; gm: number; i: number; rng: () => number }
 
 const FENCES: Record<FenceKind, (s: Seg) => void> = {
@@ -916,6 +1319,38 @@ const FENCES: Record<FenceKind, (s: Seg) => void> = {
     c.box(s.mx, gm + 0.55, s.mz, len, 0.07, 0.06, yaw, WOOD_DARK, 1)
     if (s.i % 3 === 0) c.cyl(x0, s.g0 + 0.85, z0, 0.08, 1.7, WOOD_DARK, 1)
   },
+  rail(s) {
+    const { c, x0, z0, mx, mz, len, yaw, g0, gm } = s
+    c.cyl(x0, g0 + 0.5, z0, 0.09, 1.0, WOOD_DARK, 0)
+    c.box(mx, gm + 0.85, mz, len, 0.05, 0.05, yaw, [0.78, 0.72, 0.55], 0)
+    c.box(mx, gm + 0.45, mz, len, 0.05, 0.05, yaw, [0.78, 0.72, 0.55], 0)
+    if (s.i % 5 === 0) c.sphere(x0, g0 + 1.1, z0, 0.1, 0.14, 0.1, [1, 0.75, 0.3], 0, 1.6)
+  },
+  rampart(s) {
+    const { c, mx, mz, len, yaw, gm } = s
+    c.box(mx, gm + 1.0, mz, len + 0.05, 2.4, 0.9, yaw, s.i % 2 ? WHITE_STONE : WHITE_STONE2, 0)
+    c.box(mx, gm + 2.3, mz, len + 0.08, 0.2, 1.1, yaw, WHITE_STONE2, 0)
+    if (s.i % 2 === 0) c.box(mx, gm + 2.65, mz, len * 0.55, 0.5, 0.5, yaw, WHITE_STONE, 0)
+    if (s.i % 6 === 0) c.box(s.x0, gm + 1.5, s.z0, 0.8, 3.2, 1.2, yaw, WHITE_STONE2, 0)
+  },
+  bastion(s) {
+    const { c, mx, mz, len, yaw, gm } = s
+    c.box(mx, gm + 1.2, mz, len + 0.06, 2.8, 1.0, yaw, s.i % 3 ? DWARF_STONE : DWARF_STONE2, 0.15)
+    c.box(mx, gm + 2.7, mz, len + 0.1, 0.3, 1.2, yaw, DWARF_STONE2, 0)
+    if (s.i % 4 === 0) {
+      c.box(s.x0, gm + 1.8, s.z0, 1.0, 3.6, 1.2, yaw, DWARF_STONE2, 0.1)
+      c.box(s.x0, gm + 2.3, s.z0, 0.12, 0.5, 1.25, yaw, FORGE, 0, 1.3)
+    }
+  },
+  leafhedge(s) {
+    const { c, mx, mz, len, gm } = s
+    const a = s.i % 2
+    c.sphere(mx, gm + 0.6, mz, len * 0.62, 0.7, 0.62, [a ? 0.62 : 0.82, a ? 0.68 : 0.7, a ? 0.2 : 0.22], 0, 0.2)
+    if (s.i % 4 === 0) {
+      c.cyl(mx, gm + 1.2, mz, 0.05, 2.4, ELF_WHITE, 0)
+      c.sphere(mx, gm + 2.5, mz, 0.14, 0.2, 0.14, [0.7, 1, 0.6], 0, 1.8)
+    }
+  },
   hedge(s) {
     const { c, mx, mz, len, gm } = s
     c.sphere(mx, gm + 0.5, mz, len * 0.62, 0.62, 0.62, [0.22 + (s.i % 3) * 0.03, 0.4, 0.34], 0, 0.15)
@@ -969,31 +1404,131 @@ function fenceLine(c: Ctx, pts: Pt[], kind: FenceKind, gates: GateDef[], gateHal
   }
 }
 
-/** Two posts, a lintel and a hanging lantern flanking a gate gap (a = outward normal angle). */
-function gate(c: Ctx, g: GateDef, hw: number, tall: number, post: RGB, lintel: RGB, glow: RGB) {
+type GateKind = 'plain' | 'horse' | 'tusk' | 'white' | 'dwarf' | 'elf' | 'pier'
+
+/** Arch of short slabs rising from both sides of a gate, meeting near the top. */
+function arcBoxes(c: Ctx, g: GateDef, hw: number, height: number, color: RGB, t0: number, t1: number, emis: number, segs = 7, maxDeg = 84) {
   const tx = -Math.sin(g.a)
   const tz = Math.cos(g.a)
-  for (const s of [-1, 1]) {
-    const px = g.x + tx * hw * s
-    const pz = g.z + tz * hw * s
-    const gr = heightAt(px, pz)
-    c.cyl(px, gr + tall / 2 - 0.1, pz, 0.22, tall, post, 0)
-    c.sphere(px, gr + tall, pz, 0.28, 0.2, 0.28, lintel, 0, 0)
-    c.col(px, pz, 0.35)
-  }
+  const yaw = Math.atan2(-tz, tx)
   const gy = heightAt(g.x, g.z)
-  c.box(g.x, gy + tall - 0.1, g.z, hw * 2 + 0.5, 0.2, 0.22, Math.atan2(-tz, tx), lintel, 0)
-  c.sphere(g.x, gy + tall - 0.55, g.z, 0.12, 0.16, 0.12, glow, 0, 2.0)
+  for (const s of [-1, 1]) {
+    for (let i = 0; i < segs; i++) {
+      const p0 = (i / segs) * ((maxDeg * Math.PI) / 180)
+      const p1 = ((i + 1) / segs) * ((maxDeg * Math.PI) / 180)
+      const x0 = hw * Math.cos(p0) * s
+      const y0 = height * Math.sin(p0)
+      const x1 = hw * Math.cos(p1) * s
+      const y1 = height * Math.sin(p1)
+      const mx = (x0 + x1) / 2
+      const my = (y0 + y1) / 2
+      const len = Math.hypot(x1 - x0, y1 - y0)
+      const th = t0 + (t1 - t0) * (i / segs)
+      c.box(g.x + tx * mx, gy + my, g.z + tz * mx, len + 0.06, th, Math.max(th, 0.3), yaw, color, 0, emis, 0, Math.atan2(y1 - y0, x1 - x0))
+    }
+  }
 }
 
-/** Round corner tower with a conical or domed roof. */
-function turret(c: Ctx, x: number, z: number, h: number, wall: RGB, roof: RGB, dome = false) {
+/** Gate dressing per culture (a = outward normal angle); `plain` is two posts, a lintel and a lantern. */
+function gate(c: Ctx, g: GateDef, hw: number, tall: number, post: RGB, lintel: RGB, glow: RGB, kind: GateKind = 'plain') {
+  const tx = -Math.sin(g.a)
+  const tz = Math.cos(g.a)
+  const yaw = Math.atan2(-tz, tx)
+  const gy = heightAt(g.x, g.z)
+  const at = (o: number): Pt => [g.x + tx * o, g.z + tz * o]
+  if (kind === 'tusk') {
+    arcBoxes(c, g, hw + 0.2, tall + 0.9, IVORY, 0.5, 0.12, 0, 8, 86)
+    for (const s of [-1, 1]) {
+      const [px, pz] = at((hw + 0.2) * s)
+      c.sphere(px, heightAt(px, pz) + 0.3, pz, 0.45, 0.4, 0.45, [0.7, 0.55, 0.38], 0, 0)
+      c.cyl(px + tx * 0.9 * s, heightAt(px, pz) + 1.7, pz + tz * 0.9 * s, 0.05, 3.4, WOOD_DARK)
+      c.box(px + tx * 1.2 * s, heightAt(px, pz) + 2.5, pz + tz * 1.2 * s, 0.05, 1.2, 0.6, yaw + Math.PI / 2, [0.72, 0.14, 0.1])
+      c.col(px, pz, 0.45)
+    }
+    c.sphere(g.x, gy + tall + 0.9, g.z, 0.16, 0.2, 0.16, glow, 0, 2)
+    return
+  }
+  if (kind === 'white' || kind === 'dwarf') {
+    const dw = kind === 'dwarf'
+    const off = hw + 0.7
+    const stone = dw ? DWARF_STONE : WHITE_STONE
+    const stone2 = dw ? DWARF_STONE2 : WHITE_STONE2
+    const th = dw ? tall + 1.2 : tall + 1.4
+    for (const s of [-1, 1]) {
+      const [px, pz] = at(off * s)
+      const gr = heightAt(px, pz)
+      c.box(px, gr + th / 2 - 0.1, pz, 1.3, th, 1.5, yaw, stone, dw ? 0.2 : 0)
+      c.box(px, gr + th + 0.2, pz, 1.6, 0.35, 1.8, yaw, stone2, 0)
+      if (dw) c.cone(px, gr + th + 0.4, pz, 0.45, 0.9, FORGE, 0, 2.2)
+      else for (const k of [-1, 1]) c.box(px + tx * 0.5 * k, gr + th + 0.65, pz + tz * 0.5 * k, 0.4, 0.5, 0.4, yaw, stone, 0)
+      c.col(px, pz, 0.9)
+    }
+    if (dw) {
+      c.box(g.x, gy + th + 0.15, g.z, off * 2 + 1.0, 0.9, 1.6, yaw, stone2, 0)
+      for (let i = 0; i < 7; i++) {
+        const [rx, rz] = at(-1.2 + i * 0.4)
+        c.box(rx, gy + th + 0.15, rz, 0.14, 0.34, 1.64, yaw, FORGE, 0, 1.4)
+      }
+    } else {
+      arcBoxes(c, g, hw + 0.2, tall * 0.85, stone, 0.55, 0.4, 0, 8, 90)
+      for (const s of [-1, 1]) {
+        const [bx, bz] = at(off * s)
+        c.box(bx, gy + th - 0.6, bz + 0, 0.9, 1.6, 0.04, yaw + Math.PI / 2, SLATE_BLUE)
+      }
+    }
+    c.sphere(g.x, gy + tall - 0.4, g.z, 0.12, 0.16, 0.12, glow, 0, 2)
+    return
+  }
+  if (kind === 'elf') {
+    arcBoxes(c, g, hw + 0.1, tall + 0.8, ELF_WHITE, 0.2, 0.08, 0.15, 9, 88)
+    for (const s of [-1, 1]) {
+      const [px, pz] = at((hw + 0.1) * s)
+      c.cyl(px, heightAt(px, pz) + 0.3, pz, 0.2, 0.6, ELF_WHITE)
+      c.col(px, pz, 0.35)
+    }
+    c.sphere(g.x, gy + tall + 0.9, g.z, 0.22, 0.26, 0.22, MALLORN_GOLD, 0, 1.0)
+    c.sphere(g.x, gy + tall - 0.3, g.z, 0.12, 0.2, 0.12, [0.7, 1, 0.6], 0, 2.0)
+    return
+  }
+  const extra = kind === 'horse' ? 1.0 : kind === 'pier' ? 0.8 : 0
+  const t = tall + extra
+  for (const s of [-1, 1]) {
+    const [px, pz] = at(hw * s)
+    const gr = heightAt(px, pz)
+    c.cyl(px, gr + t / 2 - 0.1, pz, kind === 'pier' ? 0.16 : 0.22, t, post, 0)
+    if (kind === 'horse') {
+      c.box(px, gr + t + 0.35, pz, 0.14, 0.9, 0.14, yaw, [0.6, 0.46, 0.3], 0, 0, 0, -0.5 * s)
+      c.box(px + tx * 0.3 * s, gr + t + 0.82, pz + tz * 0.3 * s, 0.26, 0.2, 0.16, yaw, [0.62, 0.48, 0.32])
+    } else c.sphere(px, gr + t, pz, 0.28, 0.2, 0.28, lintel, 0, 0)
+    c.col(px, pz, 0.35)
+  }
+  c.box(g.x, gy + t - 0.1, g.z, hw * 2 + 0.5, 0.2, 0.22, yaw, lintel, 0)
+  if (kind === 'horse') c.sphere(g.x, gy + t + 0.45, g.z, 0.5, 0.5, 0.2, [0.95, 0.78, 0.25], 0, 0.9)
+  if (kind === 'pier') c.box(g.x, gy + t * 0.55, g.z, hw * 2, 0.06, 0.06, yaw, [0.78, 0.72, 0.55], 0)
+  c.sphere(g.x, gy + t - 0.55, g.z, 0.12, 0.16, 0.12, glow, 0, 2.0)
+}
+
+type TurretShape = 'round' | 'dome' | 'square' | 'log'
+/** Corner tower: round stone, domed, square dwarf-keep or log watch-post. */
+function turret(c: Ctx, x: number, z: number, h: number, wall: RGB, roof: RGB, shape: TurretShape = 'round') {
   const g = heightAt(x, z)
-  c.cyl(x, g + h / 2 - 0.2, z, 1.2, h + 0.4, wall, 0.4)
-  c.cyl(x, g + h + 0.1, z, 1.45, 0.3, [wall[0] * 0.9, wall[1] * 0.9, wall[2] * 0.9], 0.2)
-  if (dome) c.sphere(x, g + h + 0.35, z, 1.35, 0.95, 1.35, roof, 0, 0)
-  else c.cone(x, g + h + 1.1, z, 1.55, 1.9, roof)
-  c.sphere(x, g + h * 0.7, z, 0.14, 0.2, 0.14, LAMP, 0, 1.8)
+  if (shape === 'square') {
+    c.box(x, g + h / 2 - 0.2, z, 2.4, h + 0.4, 2.4, c.yaw, wall, 0.3)
+    c.box(x, g + h + 0.15, z, 2.9, 0.4, 2.9, c.yaw, [wall[0] * 0.85, wall[1] * 0.85, wall[2] * 0.85], 0.2)
+    c.cone(x, g + h + 0.35, z, 0.45, 0.9, FORGE, 0, 2.2)
+    c.box(x, g + h * 0.65, z, 0.16, 0.7, 2.5, c.yaw, FORGE, 0, 1.3)
+  } else if (shape === 'log') {
+    c.disc(x, g + h / 2 - 0.2, z, 1.2, h + 0.4, LOG_B)
+    c.disc(x, g + h + 0.1, z, 1.5, 0.3, LOG_A)
+    c.cone(x, g + h + 0.25, z, 1.7, 1.8, roof)
+    c.sphere(x, g + h * 0.7, z, 0.14, 0.2, 0.14, LAMP, 0, 1.8)
+  } else {
+    c.disc(x, g + h / 2 - 0.2, z, 1.2, h + 0.4, wall)
+    c.disc(x, g + h + 0.1, z, 1.45, 0.3, [wall[0] * 0.9, wall[1] * 0.9, wall[2] * 0.9])
+    if (shape === 'dome') c.sphere(x, g + h + 0.35, z, 1.35, 0.95, 1.35, roof, 0, 0)
+    else c.cone(x, g + h + 1.1, z, 1.55, 1.9, roof)
+    c.sphere(x, g + h * 0.7, z, 0.14, 0.2, 0.14, LAMP, 0, 1.8)
+  }
   c.col(x, z, 1.5)
 }
 
@@ -1058,6 +1593,7 @@ interface VStyle {
   path: RGB
   centre: (f: Frame, r: () => number) => void
   lamp: Parameters<typeof lamp>[1]
+  gateKind?: GateKind
   lampTint?: RGB
   fence: FenceKind
   gateTall: number
@@ -1070,45 +1606,53 @@ interface VStyle {
 }
 
 const STYLES: Record<number, VStyle> = {
+  // The Shire: hobbit-holes round a Party Tree, a mill on the edge, white garden fences
   [B.Grass]: {
-    houses: [mushroomHouse, thatchCottage, towerHouse, hobbitHole, thatchCottage, mushroomHouse, towerHouse],
-    floor: [0.76, 0.66, 0.46], floor2: [0.7, 0.62, 0.5], path: [0.76, 0.66, 0.46],
-    centre: (f) => well(f), lamp: 'post', fence: 'picket', gateTall: 2.3, gatePost: WOOD_DARK, gateLintel: WOOD, windmill: true, yard: 'hay',
+    houses: [shireHole, shireHole, thatchCottage, shireHole, shireHole, shireHole, thatchCottage],
+    floor: [0.7, 0.62, 0.45], floor2: [0.64, 0.56, 0.4], path: [0.68, 0.58, 0.4],
+    centre: (f, r) => { void r; partyTree(f) }, lamp: 'lantern', lampTint: [1, 0.8, 0.4], fence: 'picket', gateTall: 2.3, gatePost: WOOD_DARK, gateLintel: WOOD, windmill: true, yard: 'hay',
   },
+  // Rohan: golden-thatched timber halls, horse-head gables, green banners, log stockade
   [B.Forest]: {
-    houses: [logCabin, logCabin, logCabin, thatchCottage, towerHouse, logCabin, hobbitHole],
-    floor: [0.52, 0.4, 0.26], floor2: [0.46, 0.36, 0.24], path: [0.5, 0.4, 0.26],
-    centre: (f) => bonfire(f), lamp: 'torch', fence: 'palisade', gateTall: 3.0, gatePost: LOG_B, gateLintel: LOG_A, stalls: [[0.2, 0.42, 0.25], [0.5, 0.3, 0.15]], yard: 'barrel',
+    houses: [rohanHall, rohanHall, rohanHall, rohanHall, rohanHall, rohanHall, rohanHall],
+    floor: [0.52, 0.45, 0.32], floor2: [0.46, 0.4, 0.3], path: [0.5, 0.42, 0.28],
+    centre: (f) => rohanStandard(f), lamp: 'banner', lampTint: ROHAN_GREEN, fence: 'palisade', gateKind: 'horse', gateTall: 3.2, gatePost: LOG_B, gateLintel: LOG_A, stalls: [[0.2, 0.42, 0.25], [0.85, 0.7, 0.3]], yard: 'barrel',
   },
+  // Harad: red-and-gold tiered pavilions and sandstone houses, tusk arches, banners
   [B.Desert]: {
-    houses: [adobeHouse, adobeHouse, adobeHouse, adobeHouse, adobeHouse, adobeHouse, adobeHouse],
+    houses: [pavilion, adobeHouse, pavilion, adobeHouse, pavilion, adobeHouse, pavilion],
     floor: [0.88, 0.76, 0.52], floor2: [0.82, 0.68, 0.46], path: [0.84, 0.72, 0.5],
-    centre: (f, r) => oasis(f, r), lamp: 'lantern', lampTint: [1, 0.7, 0.3], fence: 'adobe', gateTall: 3.2, gatePost: [0.86, 0.72, 0.48], gateLintel: [0.9, 0.78, 0.55], stalls: CLOTH, yard: 'pots',
+    centre: (f, r) => oasis(f, r), lamp: 'banner', lampTint: [0.72, 0.14, 0.1], fence: 'adobe', gateKind: 'tusk', gateTall: 3.0, gatePost: IVORY, gateLintel: IVORY, stalls: CLOTH, yard: 'pots',
   },
+  // Gondor: white stone, slate roofs, the White Tree, white ramparts and arched gates
   [B.Snow]: {
-    houses: [aFrameCabin, igloo, aFrameCabin, igloo, aFrameCabin, igloo, aFrameCabin],
-    floor: [0.86, 0.9, 0.95], floor2: [0.8, 0.86, 0.92], path: [0.78, 0.84, 0.9],
-    centre: (f) => bonfire(f), lamp: 'torch', fence: 'snowstone', gateTall: 2.6, gatePost: [0.55, 0.55, 0.58], gateLintel: [0.95, 0.97, 1], stalls: [[0.3, 0.5, 0.75], [0.8, 0.8, 0.9]], yard: 'crate',
+    houses: [gondorHouse, gondorHouse, gondorHouse, gondorHouse, gondorHouse, gondorHouse, gondorHouse],
+    floor: [0.82, 0.84, 0.88], floor2: [0.76, 0.79, 0.85], path: [0.72, 0.75, 0.8],
+    centre: (f) => whiteTree(f), lamp: 'white', lampTint: [1, 0.92, 0.7], fence: 'rampart', gateKind: 'white', gateTall: 3.4, gatePost: WHITE_STONE, gateLintel: WHITE_STONE2, stalls: [[0.24, 0.3, 0.42], [0.85, 0.85, 0.9]], yard: 'crate',
   },
+  // Lake-town: pile-dwellings on a plank street, rope rails, lanterns, rowing boats
   [B.Tropical]: {
-    houses: [stiltHut, stiltHut, stiltHut, stiltHut, mushroomHouse, stiltHut, stiltHut],
-    floor: [0.9, 0.82, 0.58], floor2: [0.84, 0.74, 0.5], path: [0.86, 0.78, 0.55],
-    centre: (f) => totem(f), lamp: 'lantern', lampTint: [1, 0.6, 0.35], fence: 'bamboo', gateTall: 2.8, gatePost: [0.6, 0.7, 0.3], gateLintel: [0.7, 0.55, 0.3], stalls: [[0.9, 0.3, 0.3], [0.2, 0.65, 0.5], [0.95, 0.75, 0.2]], yard: 'pots',
+    houses: [lakeHouse, lakeHouse, lakeHouse, lakeHouse, lakeHouse, lakeHouse, lakeHouse],
+    floor: [0.5, 0.4, 0.28], floor2: [0.46, 0.36, 0.25], path: [0.5, 0.38, 0.26],
+    centre: (f) => pierMarket(f), lamp: 'lantern', lampTint: [1, 0.7, 0.3], fence: 'rail', gateKind: 'pier', gateTall: 2.8, gatePost: WOOD_DARK, gateLintel: [0.5, 0.38, 0.26], stalls: [[0.7, 0.25, 0.2], [0.2, 0.5, 0.55], [0.85, 0.65, 0.2]], yard: 'barrel',
   },
+  // Marsh-folk: crooked stilt shacks, reed screens, pale marsh-lights
   [B.Swamp]: {
-    houses: [(f, r) => stiltHut(f, r, true), (f, r) => stiltHut(f, r, true), (f, r) => stiltHut(f, r, true), (f, r) => stiltHut(f, r, true), hobbitHole, (f, r) => stiltHut(f, r, true), (f, r) => stiltHut(f, r, true)],
+    houses: [marshHouse, marshHouse, marshHouse, marshHouse, hobbitHole, marshHouse, marshHouse],
     floor: [0.42, 0.38, 0.26], floor2: [0.38, 0.35, 0.25], path: [0.4, 0.34, 0.22],
     centre: (f) => well(f, 1), lamp: 'lantern', lampTint: [0.6, 1, 0.5], fence: 'reed', gateTall: 2.4, gatePost: WOOD_DARK, gateLintel: [0.4, 0.3, 0.2], stalls: [[0.3, 0.4, 0.25], [0.4, 0.3, 0.2]], yard: 'barrel',
   },
+  // Dwarf-hold: massive squared stone, rune-lit gates, braziers, forge glow
   [B.Mountain]: {
-    houses: [stoneChalet, stoneChalet, stoneChalet, towerHouse, stoneChalet, stoneChalet, stoneChalet],
-    floor: [0.6, 0.58, 0.54], floor2: [0.54, 0.52, 0.5], path: [0.58, 0.56, 0.52],
-    centre: (f) => obelisk(f), lamp: 'post', lampTint: [1, 0.85, 0.5], fence: 'stone', gateTall: 3.0, gatePost: [0.52, 0.5, 0.47], gateLintel: [0.58, 0.56, 0.52], stalls: [[0.35, 0.4, 0.5], [0.6, 0.35, 0.25]], tower: true, yard: 'crate',
+    houses: [dwarfHall, dwarfHall, dwarfHall, dwarfHall, dwarfHall, dwarfHall, dwarfHall],
+    floor: [0.48, 0.48, 0.5], floor2: [0.4, 0.4, 0.44], path: [0.44, 0.44, 0.47],
+    centre: (f) => dwarfMonument(f), lamp: 'brazier', fence: 'bastion', gateKind: 'dwarf', gateTall: 3.6, gatePost: DWARF_STONE, gateLintel: DWARF_STONE2, stalls: [[0.35, 0.4, 0.5], [0.6, 0.35, 0.25]], tower: true, yard: 'crate',
   },
+  // Elven realm: white colonnades, copper-green roofs, mallorn flets, leaf arches
   [B.Magical]: {
-    houses: [crystalHouse, crystalHouse, crystalHouse, crystalHouse, crystalHouse, crystalHouse, crystalHouse],
-    floor: [0.7, 0.62, 0.82], floor2: [0.62, 0.55, 0.78], path: [0.66, 0.6, 0.8],
-    centre: (f, r) => crystalFountain(f, r), lamp: 'crystal', lampTint: [0.6, 0.95, 1], fence: 'hedge', gateTall: 2.8, gatePost: [0.7, 0.66, 0.82], gateLintel: [0.55, 0.45, 1], stalls: [[0.55, 0.3, 0.8], [0.3, 0.7, 0.8]], yard: 'pots',
+    houses: [elvenPavilion, mallornFlet, elvenPavilion, mallornFlet, elvenPavilion, mallornFlet],
+    floor: [0.86, 0.86, 0.78], floor2: [0.8, 0.84, 0.72], path: [0.8, 0.8, 0.7],
+    centre: (f) => elvenFountain(f), lamp: 'elven', lampTint: [0.75, 1, 0.65], fence: 'leafhedge', gateKind: 'elf', gateTall: 3.0, gatePost: ELF_WHITE, gateLintel: MALLORN_GOLD, stalls: [[0.4, 0.6, 0.45], [0.9, 0.8, 0.35]], yard: 'pots',
   },
 }
 
@@ -1260,46 +1804,77 @@ function ringVillage(c: Ctx, st: VStyle, o: RingOpts) {
   })
   fenceLine(c, fence, st.fence, gates, 1.7, o.step)
   for (const g of gates) {
-    gate(c, g, 1.7, st.gateTall, st.gatePost, st.gateLintel, st.lampTint ?? LAMP)
+    gate(c, g, 1.7, st.gateTall, st.gatePost, st.gateLintel, st.lampTint ?? LAMP, st.gateKind)
     const rim = o.plazaR * 0.9
     road(c, wander(cx + Math.cos(g.a) * rim, cz + Math.sin(g.a) * rim, g.x + Math.cos(g.a) * 2.8, g.z + Math.sin(g.a) * 2.8, o.curve, 10, g.a), 2.1, st.path)
   }
   c.setCircle(o.fenceR * (1 - o.wob) - 1.2)
 }
 
-/** Desert: a walled square, two crossing streets, houses fronting the streets, four corner towers. */
-function desertVillage(c: Ctx, st: VStyle) {
+/** Rohan: a palisaded hill-town. One gate, a long avenue between golden-thatched halls, up broad steps to Meduseld on its stone terrace. */
+function rohanVillage(c: Ctx, st: VStyle) {
   const rng = c.rng
-  const hw = 12.6
-  road(c, [c.w(-hw - 2.5, 0), c.w(hw + 2.5, 0)], 2.8, st.path)
-  road(c, [c.w(0, -hw - 2.5), c.w(0, hw + 2.5)], 2.8, st.path)
-  plaza(c, st, 4.4, true)
-  lampRing(c, st, 4.9, 4, Math.PI / 4)
-  const spots: Pt[] = [[8, 5], [8, -5], [-8, 5], [-8, -5], [5, 8.6], [-5, 8.6], [5, -8.6], [-5, -8.6]]
-  spots.forEach(([lx, lz], i) => {
-    const [x, z] = c.w(lx, lz)
-    const [tx, tz] = Math.abs(lx) > Math.abs(lz) ? c.w(lx, 0) : c.w(0, lz)
-    house(c, st, i, x, z, tx, tz, rng)
-    const [yx, yz] = c.w(lx + Math.sign(lx) * (Math.abs(lx) > Math.abs(lz) ? 3.3 : 0.2), lz + Math.sign(lz) * (Math.abs(lx) > Math.abs(lz) ? 0.2 : 3.3))
-    yardProp(c, st, yx, yz, rng)
-  })
-  for (const [lx, lz] of [[-6.6, -2.4], [6.6, 2.4]] as Pt[]) {
-    const [x, z] = c.w(lx, lz)
-    const [tx, tz] = c.w(lx, 0)
-    stallAt(c, st, x, z, tx, tz, rng)
+  const hw = 10.6
+  const hd = 14.4
+  road(c, [c.w(0, -hd - 2.5), c.w(0, 3.2)], 3.0, st.path)
+  // Meduseld on a stone terrace, door facing the gate
+  const [hx, hz] = c.w(0, 8.65)
+  const [fx, fz] = c.w(0, -40)
+  const pf = new Frame(c, hx, hz, c.yaw)
+  c.box(hx, pf.gy + 0.45, hz, 11, 1.1, 10.6, c.yaw, [0.58, 0.56, 0.52], 1)
+  c.box(hx, pf.gy + 1.02, hz, 10.6, 0.1, 10.2, c.yaw, [0.64, 0.62, 0.57], 0)
+  for (let k = 0; k < 4; k++) {
+    const [sx, sz] = c.w(0, 3.1 - k * 0.55)
+    c.box(sx, pf.gy + ((4 - k) * 0.25) / 2 - 0.05, sz, 5.4, (4 - k) * 0.25 + 0.1, 0.6, c.yaw, [0.6, 0.58, 0.54], 0.5)
   }
-  const corners: Pt[] = [[-hw, -hw], [hw, -hw], [hw, hw], [-hw, hw]]
-  const gates = [gateAtLocal(c, hw, 0, 1, 0), gateAtLocal(c, -hw, 0, -1, 0), gateAtLocal(c, 0, hw, 0, 1), gateAtLocal(c, 0, -hw, 0, -1)]
-  fenceLine(c, corners.map(([lx, lz]) => c.w(lx, lz)), st.fence, gates, 1.9, 1.3)
-  for (const g of gates) gate(c, g, 1.7, st.gateTall, st.gatePost, st.gateLintel, st.lampTint ?? LAMP)
+  for (const s of [-1, 1]) {
+    const [bx, bz] = c.w(s * 3.3, 3.4)
+    c.box(bx, pf.gy + 0.4, bz, 0.9, 0.8, 0.7, c.yaw, [0.55, 0.53, 0.5], 1)
+  }
+  const hall = new Frame(c, hx, hz, Math.atan2(fx - hx, fz - hz))
+  hall.gy += 1.05
+  rohanHall(hall, rng, true)
+  for (const [lx, lz] of [[-3.6, 6.4], [3.6, 6.4], [-3.6, 11.4], [3.6, 11.4], [0, 8.6]] as Pt[]) {
+    const [x, z] = c.w(lx, lz)
+    c.col(x, z, 3.0)
+  }
+  // small plaza with the standard, halls fronting the avenue
+  const [px, pz] = c.w(0, -3.4)
+  const pfm = new Frame(c, px, pz, c.yaw)
+  c.disc(px, pfm.gy + 0.04, pz, 3.4, 0.1, st.floor)
+  st.centre(pfm, rng)
+  const rows = [-10.6, -6.6, -0.6]
+  let i = 0
+  for (const side of [-1, 1]) {
+    for (const lz of rows) {
+      const lx = side * 6.5
+      const [x, z] = c.w(lx, lz)
+      const [tx, tz] = c.w(0, lz)
+      house(c, st, i++, x, z, tx, tz, rng)
+      lane(c, st, x, z, tx, tz, 1.4)
+      const [yx, yz] = c.w(lx + side * 2.6, lz + 2.4)
+      yardProp(c, st, yx, yz, rng)
+    }
+  }
+  for (const [lx, lz] of [[-2.5, -12], [2.5, -12], [-2.5, -8.6], [2.5, -8.6], [-2.5, 1.2], [2.5, 1.2]] as Pt[]) {
+    const [x, z] = c.w(lx, lz)
+    lamp(new Frame(c, x, z, 0), st.lamp, st.lampTint)
+  }
+  const [stx, stz] = c.w(-3.1, 1.8)
+  const [stt, sttz] = c.w(0, 1.8)
+  stallAt(c, st, stx, stz, stt, sttz, rng)
+  const corners: Pt[] = [[-hw, -hd], [hw, -hd], [hw, hd], [-hw, hd]]
+  const gates = [gateAtLocal(c, 0, -hd, 0, -1)]
+  fenceLine(c, corners.map(([lx, lz]) => c.w(lx, lz)), st.fence, gates, 2.0, 1.1)
+  for (const g of gates) gate(c, g, 1.9, st.gateTall, st.gatePost, st.gateLintel, st.lampTint ?? LAMP, st.gateKind)
   for (const [lx, lz] of corners) {
     const [x, z] = c.w(lx, lz)
-    turret(c, x, z, 4.4, [0.86, 0.72, 0.48], [0.9, 0.78, 0.55], true)
+    turret(c, x, z, 4.6, LOG_B, GOLD_THATCH, 'log')
   }
-  c.setRect(hw - 0.9, hw - 0.9)
+  c.setRect(hw - 0.9, hd - 0.9)
 }
 
-/** Mountain: a stone fortress, long avenue lined with chalets, obelisk plaza, watchtowers and corner turrets. */
+/** Dwarf-hold: a stone fortress, long avenue lined with halls, brazier plaza, keeps and square corner towers. */
 function mountainVillage(c: Ctx, st: VStyle) {
   const rng = c.rng
   const hw = 10
@@ -1330,7 +1905,7 @@ function mountainVillage(c: Ctx, st: VStyle) {
   for (const side of [-1, 1]) {
     const [x, z] = c.w(side * 6.8, 11.4)
     const [ax, az] = c.w(0, 11.4)
-    watchtower(new Frame(c, x, z, Math.atan2(ax - x, az - z)))
+    dwarfKeep(new Frame(c, x, z, Math.atan2(ax - x, az - z)))
   }
   const [sx, sz] = c.w(-3.3, -8.2)
   const [stx, stz] = c.w(0, -8.2)
@@ -1338,15 +1913,15 @@ function mountainVillage(c: Ctx, st: VStyle) {
   const corners: Pt[] = [[-hw, -hd], [hw, -hd], [hw, hd], [-hw, hd]]
   const gates = [gateAtLocal(c, 0, -hd, 0, -1), gateAtLocal(c, 0, hd, 0, 1)]
   fenceLine(c, corners.map(([lx, lz]) => c.w(lx, lz)), st.fence, gates, 2.0, 1.3)
-  for (const g of gates) gate(c, g, 1.9, st.gateTall + 0.6, st.gatePost, st.gateLintel, st.lampTint ?? LAMP)
+  for (const g of gates) gate(c, g, 1.9, st.gateTall + 0.6, st.gatePost, st.gateLintel, st.lampTint ?? LAMP, st.gateKind)
   for (const [lx, lz] of corners) {
     const [x, z] = c.w(lx, lz)
-    turret(c, x, z, 4.8, [0.52, 0.5, 0.47], [0.3, 0.34, 0.42])
+    turret(c, x, z, 4.8, DWARF_STONE, DWARF_STONE2, 'square')
   }
   c.setRect(hw - 0.9, hd - 0.9)
 }
 
-/** Tropical: a long street through an oval bamboo stockade, stilt huts both sides, totem plaza in the middle. */
+/** Lake-town: a plank street on piles between tall lake-houses, harbour market in the middle, rope rails. */
 function tropicalVillage(c: Ctx, st: VStyle) {
   const rng = c.rng
   const rx = 17.2
@@ -1354,7 +1929,7 @@ function tropicalVillage(c: Ctx, st: VStyle) {
   const bend = (lx: number) => Math.sin(lx * 0.22) * 1.5
   const street: Pt[] = []
   for (let lx = -rx - 2.5; lx <= rx + 2.5; lx += 2.2) street.push(c.w(lx, bend(lx)))
-  road(c, street, 2.6, st.path)
+  boardwalk(c, street, 3.0)
   plaza(c, st, 4.4)
   lampRing(c, st, 3.6, 4, Math.PI / 4)
   const xs = [-12.6, -7.4, 7.4, 12.6]
@@ -1364,7 +1939,9 @@ function tropicalVillage(c: Ctx, st: VStyle) {
       const lz = side * (6.6 + (i % 2) * 1.5)
       const [x, z] = c.w(lx, lz)
       const [tx, tz] = c.w(lx, bend(lx) + side * 1.3)
-      house(c, st, i++, x, z, tx, tz, rng)
+      if (lx === 12.6 && side === 1) lakeHouse(new Frame(c, x, z, Math.atan2(tx - x, tz - z)), rng, true)
+      else house(c, st, i, x, z, tx, tz, rng)
+      i++
       boardwalk(c, wander(...c.w(lx, bend(lx) + side * 1.3), ...c.w(lx + 0.0, lz - side * 2.6), 0.5, 3, i), 1.3)
       const [yx, yz] = c.w(lx + 3.1, lz)
       yardProp(c, st, yx, yz, rng)
@@ -1383,7 +1960,7 @@ function tropicalVillage(c: Ctx, st: VStyle) {
   }
   const gates = [gateAtLocal(c, rx, bend(rx), 1, 0), gateAtLocal(c, -rx, bend(-rx), -1, 0)]
   fenceLine(c, oval, st.fence, gates, 1.9, 1.3)
-  for (const g of gates) gate(c, g, 1.7, st.gateTall, st.gatePost, st.gateLintel, st.lampTint ?? LAMP)
+  for (const g of gates) gate(c, g, 1.7, st.gateTall, st.gatePost, st.gateLintel, st.lampTint ?? LAMP, st.gateKind)
   c.setEllipse(rx - 1.2, rz - 1.2)
 }
 
@@ -1420,7 +1997,7 @@ function swampVillage(c: Ctx, st: VStyle) {
   })
   fenceLine(c, polyPts(cx, cz, shape, 70), st.fence, gates, 2.0, 1.3, 0.16)
   for (const g of gates) {
-    gate(c, g, 1.9, st.gateTall, st.gatePost, st.gateLintel, st.lampTint ?? LAMP)
+    gate(c, g, 1.9, st.gateTall, st.gatePost, st.gateLintel, st.lampTint ?? LAMP, st.gateKind)
     boardwalk(c, wander(cx + Math.cos(g.a) * 4.4, cz + Math.sin(g.a) * 4.4, g.x + Math.cos(g.a) * 2.6, g.z + Math.sin(g.a) * 2.6, 2.0, 9, g.a), 1.6)
   }
   const a = (angles[5] + angles[6]) / 2
@@ -1428,7 +2005,7 @@ function swampVillage(c: Ctx, st: VStyle) {
   c.setCircle(R * 0.93 - 1.0)
 }
 
-/** Magical: six crystal houses in a hexagon, a ring road and six spokes, a hedge circle with spire groves. */
+/** Elven realm: six pavilions and mallorn flets in a hexagon, a ring road and six spokes, a golden leaf-hedge with mallorn groves. */
 function magicalVillage(c: Ctx, st: VStyle) {
   const rng = c.rng
   const { x: cx, z: cz } = c.site
@@ -1449,26 +2026,25 @@ function magicalVillage(c: Ctx, st: VStyle) {
     house(c, st, i, hx, hz, cx, cz, rng)
     lane(c, st, hx, hz, cx + Math.cos(a) * 7.3, cz + Math.sin(a) * 7.3, 1.3)
     lamp(new Frame(c, cx + Math.cos(a) * 7.3 + Math.cos(a + 1.57) * 1.5, cz + Math.sin(a) * 7.3 + Math.sin(a + 1.57) * 1.5, 0), st.lamp, st.lampTint)
-    crystalSpire(new Frame(c, cx + Math.cos(a) * 16.2, cz + Math.sin(a) * 16.2, rng() * 6), rng, 3, 0.9)
+    mallornTree(new Frame(c, cx + Math.cos(a) * 16.4, cz + Math.sin(a) * 16.4, rng() * 6), 6.5, 0.8)
     yardProp(c, st, hx + Math.cos(a + 0.7) * 3.4, hz + Math.sin(a + 0.7) * 3.4, rng)
   }
   const R = 18.7
   const gates: GateDef[] = [0, 2, 4].map((i) => ({ x: cx + Math.cos(sAng(i)) * R, z: cz + Math.sin(sAng(i)) * R, a: sAng(i) }))
   fenceLine(c, polyPts(cx, cz, () => R, Math.round((TAU * R) / 1.3)), st.fence, gates, 1.9, 1.3)
-  for (const g of gates) gate(c, g, 1.7, st.gateTall, st.gatePost, st.gateLintel, st.lampTint ?? LAMP)
+  for (const g of gates) gate(c, g, 1.7, st.gateTall, st.gatePost, st.gateLintel, st.lampTint ?? LAMP, st.gateKind)
   for (const i of [1, 3, 5]) {
     const a = sAng(i)
-    const sf = new Frame(c, cx + Math.cos(a) * 14.6, cz + Math.sin(a) * 14.6, 0)
-    crystalSpire(sf, rng, 5, 1.2)
+    mallornTree(new Frame(c, cx + Math.cos(a) * 15.0, cz + Math.sin(a) * 15.0, 0), 8.6, 1.1)
   }
   c.setCircle(R - 1.4)
 }
 
 const LAYOUTS: Record<number, (c: Ctx, st: VStyle) => void> = {
   [B.Grass]: (c, st) => ringVillage(c, st, { plazaR: 5.8, n: 7, rMin: 10.8, rMax: 12.6, jitter: 0.12, fenceR: 18.4, wob: 0, gates: 3, step: 1.3, ringRoad: 8.2, curve: 0, extra: 'windmill' }),
-  [B.Forest]: (c, st) => ringVillage(c, st, { plazaR: 4.6, n: 6, rMin: 9.4, rMax: 13.6, jitter: 0.4, fenceR: 17.4, wob: 0.05, gates: 2, step: 1.1, curve: 1.6, extra: 'logs' }),
-  [B.Snow]: (c, st) => ringVillage(c, st, { plazaR: 4.2, n: 6, rMin: 8.4, rMax: 9.8, jitter: 0.1, fenceR: 15.2, wob: 0, gates: 2, step: 1.2, ringRoad: 6.4, curve: 0.8, extra: 'none' }),
-  [B.Desert]: desertVillage,
+  [B.Forest]: rohanVillage,
+  [B.Snow]: (c, st) => ringVillage(c, st, { plazaR: 5.0, n: 6, rMin: 9.2, rMax: 10.4, jitter: 0.08, fenceR: 16.2, wob: 0, gates: 2, step: 1.2, ringRoad: 7.4, curve: 0, extra: 'none' }),
+  [B.Desert]: (c, st) => ringVillage(c, st, { plazaR: 5.6, n: 7, rMin: 10.6, rMax: 12.6, jitter: 0.18, fenceR: 18.2, wob: 0.02, gates: 3, step: 1.3, curve: 1.2, extra: 'none' }),
   [B.Mountain]: mountainVillage,
   [B.Tropical]: tropicalVillage,
   [B.Swamp]: swampVillage,
