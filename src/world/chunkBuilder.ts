@@ -537,7 +537,7 @@ function addLily(b: PropBatch, l: ReturnType<typeof getChunkData>['lilies'][numb
   }
 }
 
-const TPL_BY_KIND: Record<string, Template> = { box: TPL.box, cyl: TPL.cyl, cone: TPL.cone, sphere: TPL.sphere, dome: TPL.dome }
+const TPL_BY_KIND: Record<string, Template> = { box: TPL.box, cyl: TPL.cyl, disc: TPL.disc, cone: TPL.cone, sphere: TPL.sphere, dome: TPL.dome }
 
 function* propsStep(cx: number, cz: number, q: QualitySettings, group: THREE.Group): Generator<void> {
   const data = getChunkData(cx, cz)

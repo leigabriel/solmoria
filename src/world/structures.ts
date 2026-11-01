@@ -4,7 +4,7 @@ import { B } from './biomes'
 import type { Site } from './hydrology'
 
 export interface SPart {
-  kind: 'box' | 'cyl' | 'cone' | 'sphere' | 'dome'
+  kind: 'box' | 'cyl' | 'disc' | 'cone' | 'sphere' | 'dome'
   x: number
   y: number
   z: number
@@ -47,6 +47,29 @@ class Ctx {
     this.cos = Math.cos(yaw)
     this.sin = Math.sin(yaw)
   }
+  /** where villagers may wander; layouts narrow this to their own walls */
+  inside: (x: number, z: number) => boolean = (x, z) => Math.hypot(x - this.site.x, z - this.site.z) < 17.2
+  setCircle(r: number) {
+    this.inside = (x, z) => Math.hypot(x - this.site.x, z - this.site.z) < r
+  }
+  /** world -> site-local */
+  local(x: number, z: number): [number, number] {
+    const dx = x - this.site.x
+    const dz = z - this.site.z
+    return [dx * this.cos - dz * this.sin, dx * this.sin + dz * this.cos]
+  }
+  setRect(hw: number, hd: number) {
+    this.inside = (x, z) => {
+      const [lx, lz] = this.local(x, z)
+      return Math.abs(lx) < hw && Math.abs(lz) < hd
+    }
+  }
+  setEllipse(a: number, b: number) {
+    this.inside = (x, z) => {
+      const [lx, lz] = this.local(x, z)
+      return (lx / a) ** 2 + (lz / b) ** 2 < 1
+    }
+  }
   /** site-local -> world (rotation about Y by yaw, matching three.js) */
   w(lx: number, lz: number): [number, number] {
     return [this.site.x + lx * this.cos + lz * this.sin, this.site.z - lx * this.sin + lz * this.cos]
@@ -61,6 +84,10 @@ class Ctx {
   }
   cyl(x: number, y: number, z: number, r: number, h: number, color: [number, number, number], moss = 1, rx = 0, ry = 0, rz = 0, emis = 0) {
     this.parts.push({ kind: 'cyl', x, y, z, sx: r, sy: h, sz: r, rx, ry, rz, color, moss, emis })
+  }
+  /** smooth round slab (32 sides) for plazas, pools and bases; y is the centre */
+  disc(x: number, y: number, z: number, r: number, h: number, color: [number, number, number], moss = 0, emis = 0) {
+    this.parts.push({ kind: 'disc', x, y, z, sx: r, sy: h, sz: r, rx: 0, ry: 0, rz: 0, color, moss, emis })
   }
   cone(x: number, y: number, z: number, rx_: number, h: number, color: [number, number, number], moss = 0, emis = 0, ry = 0) {
     this.parts.push({ kind: 'cone', x, y, z, sx: rx_, sy: h, sz: rx_, rx: 0, ry, rz: 0, color, moss, emis })
@@ -159,6 +186,7 @@ class Ctx {
 export interface SiteGeometry {
   parts: SPart[]
   cols: Circle[]
+  inside: (x: number, z: number) => boolean
 }
 
 function ruinCourt(c: Ctx) {
@@ -347,6 +375,10 @@ class Frame {
     const [x, z] = this.p(dx, dz)
     this.c.cyl(x, this.gy + dy, z, r, h, color, moss, 0, 0, 0, emis)
   }
+  disc(dx: number, dy: number, dz: number, r: number, h: number, color: RGB, emis = 0, moss = 0) {
+    const [x, z] = this.p(dx, dz)
+    this.c.disc(x, this.gy + dy, z, r, h, color, moss, emis)
+  }
   /** cylinder lying along local x (a log) */
   log(dx: number, dy: number, dz: number, r: number, len: number, color: RGB, yawOff = 0) {
     const [x, z] = this.p(dx, dz)
@@ -413,7 +445,7 @@ function mushroomHouse(f: Frame, rng: () => number, glow = 0) {
   }
   f.door(0.97, 0.8, 1.3)
   f.window(-0.62, 1.3, 0.78, 0.35, 0.35)
-  f.cyl(0, 0.05, 0, 1.3, 0.12, GRASSY, 1)
+  f.disc(0, 0.05, 0, 1.3, 0.12, GRASSY, 1)
   f.col(0, 0, 1.9)
 }
 
@@ -440,9 +472,9 @@ function thatchCottage(f: Frame, rng: () => number) {
 function towerHouse(f: Frame, rng: () => number, roofCol?: RGB, glowTop = false) {
   const roof = roofCol ?? pickOf(rng, ROOFS)
   const wall = pickOf(rng, WALLS)
-  f.cyl(0, 0.3, 0, 1.75, 1.5, STONE_GREY)
-  f.cyl(0, 2.4, 0, 1.45, 4.2, wall)
-  f.cyl(0, 4.6, 0, 1.75, 0.35, WOOD)
+  f.disc(0, 0.3, 0, 1.75, 1.5, STONE_GREY)
+  f.disc(0, 2.4, 0, 1.45, 4.2, wall)
+  f.disc(0, 4.6, 0, 1.75, 0.35, WOOD)
   f.cone(0, 4.75, 0, 2.2, 2.6, roof)
   f.sphere(0, 7.45, 0, 0.18, 0.18, 0.18, GLOW, 0, glowTop ? 2.6 : 1.8)
   f.door(1.44, 0.85, 1.5)
@@ -649,7 +681,7 @@ function crystalHouse(f: Frame, rng: () => number) {
 
 function windmill(f: Frame) {
   f.cone(0, 0, 0, 1.9, 5.0, [0.86, 0.8, 0.68])
-  f.cyl(0, 0.2, 0, 2.1, 0.4, [0.55, 0.52, 0.46])
+  f.disc(0, 0.2, 0, 2.1, 0.4, [0.55, 0.52, 0.46])
   f.cone(0, 4.6, 0, 1.4, 1.9, [0.55, 0.3, 0.2])
   f.door(1.55, 0.8, 1.4)
   f.window(0, 2.6, 1.0, 0.3, 0.4)
@@ -681,8 +713,8 @@ function watchtower(f: Frame) {
 
 // ---- plaza centrepieces + small props --------------------------------------------------------
 function well(f: Frame, moss = 0) {
-  f.cyl(0, 0.45, 0, 1.15, 0.9, [0.62, 0.58, 0.5], 0, moss)
-  f.cyl(0, 0.92, 0, 0.9, 0.06, [0.2, 0.45, 0.55], 0.6)
+  f.disc(0, 0.45, 0, 1.15, 0.9, [0.62, 0.58, 0.5], 0, moss)
+  f.disc(0, 0.92, 0, 0.9, 0.06, [0.2, 0.45, 0.55], 0.6)
   for (const s of [-1, 1]) f.box(s * 1.0, 1.6, 0, 0.12, 1.5, 0.12, WOOD)
   f.box(0, 2.45, 0, 2.3, 0.12, 0.12, WOOD)
   f.cone(0, 2.5, 0, 1.5, 0.85, ROOFS[0])
@@ -695,7 +727,7 @@ function bonfire(f: Frame) {
     f.box(Math.cos(a) * 1.25, 0.18, Math.sin(a) * 1.25, 0.5, 0.36, 0.42, STONE_GREY)
   }
   for (let i = 0; i < 4; i++) f.log(0, 0.35 + (i % 2) * 0.15, 0, 0.12, 1.5, LOG_B, (i / 4) * Math.PI)
-  f.cyl(0, 0.42, 0, 0.8, 0.1, [1, 0.45, 0.12], 1.4)
+  f.disc(0, 0.42, 0, 0.8, 0.1, [1, 0.45, 0.12], 1.4)
   f.cone(0, 0.45, 0, 0.45, 1.2, [1, 0.6, 0.15], 0, 1.8)
   f.cone(0, 0.6, 0, 0.26, 1.7, [1, 0.85, 0.3], 0, 2.2)
   for (let i = 0; i < 4; i++) {
@@ -706,8 +738,8 @@ function bonfire(f: Frame) {
 }
 
 function oasis(f: Frame, rng: () => number) {
-  f.cyl(0, 0.08, 0, 3.4, 0.16, [0.85, 0.72, 0.5])
-  f.cyl(0, 0.16, 0, 2.7, 0.1, [0.25, 0.6, 0.72], 0.7)
+  f.disc(0, 0.08, 0, 3.4, 0.16, [0.85, 0.72, 0.5])
+  f.disc(0, 0.16, 0, 2.7, 0.1, [0.25, 0.6, 0.72], 0.7)
   for (let i = 0; i < 12; i++) {
     const a = (i / 12) * Math.PI * 2
     f.sphere(Math.cos(a) * 2.8, 0.2, Math.sin(a) * 2.8, 0.4, 0.28, 0.4, [0.7, 0.62, 0.48])
@@ -729,7 +761,7 @@ function oasis(f: Frame, rng: () => number) {
 
 function totem(f: Frame) {
   const cols: RGB[] = [[0.7, 0.25, 0.2], [0.2, 0.55, 0.55], [0.9, 0.7, 0.2], [0.5, 0.3, 0.6]]
-  f.cyl(0, 0.3, 0, 1.0, 0.6, STONE_GREY)
+  f.disc(0, 0.3, 0, 1.0, 0.6, STONE_GREY)
   for (let i = 0; i < 4; i++) {
     f.cyl(0, 1.0 + i * 0.8, 0, 0.42, 0.78, cols[i])
     f.box(0, 1.0 + i * 0.8, 0.4, 0.5, 0.22, 0.12, [0.1, 0.07, 0.05])
@@ -737,13 +769,13 @@ function totem(f: Frame) {
     f.sphere(0.15, 1.12 + i * 0.8, 0.4, 0.06, 0.06, 0.04, GLOW, 0, 1.4)
   }
   f.cone(0, 4.2, 0, 0.5, 0.7, [0.9, 0.3, 0.2])
-  f.cyl(0, 0.62, 0, 1.15, 0.1, [1, 0.5, 0.15], 1.2)
+  f.disc(0, 0.62, 0, 1.15, 0.1, [1, 0.5, 0.15], 1.2)
   f.col(0, 0, 1.1)
 }
 
 function crystalFountain(f: Frame, rng: () => number) {
-  f.cyl(0, 0.3, 0, 2.2, 0.6, [0.7, 0.66, 0.82])
-  f.cyl(0, 0.62, 0, 1.9, 0.06, [0.45, 0.7, 1.0], 0.8, 0)
+  f.disc(0, 0.3, 0, 2.2, 0.6, [0.7, 0.66, 0.82])
+  f.disc(0, 0.62, 0, 1.9, 0.06, [0.45, 0.7, 1.0], 0.8)
   f.cyl(0, 1.0, 0, 0.55, 1.4, [0.66, 0.6, 0.8])
   const cols: RGB[] = [[0.55, 0.45, 1], [0.4, 0.9, 1], [1, 0.5, 0.85]]
   for (let i = 0; i < 5; i++) {
@@ -755,7 +787,7 @@ function crystalFountain(f: Frame, rng: () => number) {
 }
 
 function obelisk(f: Frame) {
-  f.cyl(0, 0.3, 0, 1.6, 0.6, [0.5, 0.48, 0.45])
+  f.disc(0, 0.3, 0, 1.6, 0.6, [0.5, 0.48, 0.45])
   f.box(0, 1.1, 0, 1.0, 1.0, 1.0, [0.56, 0.54, 0.5])
   f.box(0, 2.3, 0, 0.8, 1.4, 0.8, [0.6, 0.58, 0.54])
   f.cone(0, 3.0, 0, 0.58, 1.3, [0.64, 0.62, 0.58])
@@ -894,51 +926,128 @@ const FENCES: Record<FenceKind, (s: Seg) => void> = {
   },
 }
 
-/** Ring fence/wall of short straight segments that follow the terrain, with gate gaps at the given angles. */
-function ringFence(c: Ctx, cx: number, cz: number, R: number, kind: FenceKind, gates: number[], gateHalf: number, step: number) {
-  const n = Math.round((Math.PI * 2 * R) / step)
+// ---- fences, gates, roads --------------------------------------------------------------------
+type Pt = [number, number]
+interface GateDef { x: number; z: number; a: number }
+const TAU = Math.PI * 2
+
+/** Closed polygon sampled from a radius function around (cx, cz). */
+function polyPts(cx: number, cz: number, radius: (a: number) => number, n: number): Pt[] {
+  const out: Pt[] = []
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * TAU
+    const r = radius(a)
+    out.push([cx + Math.cos(a) * r, cz + Math.sin(a) * r])
+  }
+  return out
+}
+
+/** Fence/wall along a closed polygon in short straight segments that follow the terrain; segments near a gate are left open. */
+function fenceLine(c: Ctx, pts: Pt[], kind: FenceKind, gates: GateDef[], gateHalf: number, step: number, breakChance = 0) {
   const rng = mulberry32(c.site.seed + 4401)
   const colR = kind === 'hedge' ? 0.8 : kind === 'adobe' || kind === 'stone' || kind === 'snowstone' ? 0.85 : 0.7
-  for (let i = 0; i < n; i++) {
-    const a0 = (i / n) * Math.PI * 2
-    const a1 = ((i + 1) / n) * Math.PI * 2
-    const am = (a0 + a1) / 2
-    if (gates.some((g) => Math.abs(Math.atan2(Math.sin(am - g), Math.cos(am - g))) < gateHalf)) continue
-    const x0 = cx + Math.cos(a0) * R
-    const z0 = cz + Math.sin(a0) * R
-    const x1 = cx + Math.cos(a1) * R
-    const z1 = cz + Math.sin(a1) * R
-    const mx = (x0 + x1) / 2
-    const mz = (z0 + z1) / 2
-    const len = Math.hypot(x1 - x0, z1 - z0)
-    const yaw = Math.atan2(-(z1 - z0), x1 - x0)
-    FENCES[kind]({ c, x0, z0, x1, z1, mx, mz, len, yaw, g0: heightAt(x0, z0), g1: heightAt(x1, z1), gm: heightAt(mx, mz), i, rng })
-    c.col(mx, mz, colR)
+  let i = 0
+  for (let e = 0; e < pts.length; e++) {
+    const [ax, az] = pts[e]
+    const [bx, bz] = pts[(e + 1) % pts.length]
+    const n = Math.max(1, Math.round(Math.hypot(bx - ax, bz - az) / step))
+    for (let k = 0; k < n; k++) {
+      const x0 = ax + ((bx - ax) * k) / n
+      const z0 = az + ((bz - az) * k) / n
+      const x1 = ax + ((bx - ax) * (k + 1)) / n
+      const z1 = az + ((bz - az) * (k + 1)) / n
+      const mx = (x0 + x1) / 2
+      const mz = (z0 + z1) / 2
+      i++
+      if (gates.some((g) => Math.hypot(g.x - mx, g.z - mz) < gateHalf)) continue
+      if (breakChance > 0 && rng() < breakChance) continue
+      const len = Math.hypot(x1 - x0, z1 - z0)
+      const yaw = Math.atan2(-(z1 - z0), x1 - x0)
+      FENCES[kind]({ c, x0, z0, x1, z1, mx, mz, len, yaw, g0: heightAt(x0, z0), g1: heightAt(x1, z1), gm: heightAt(mx, mz), i, rng })
+      c.col(mx, mz, colR)
+    }
   }
 }
 
-/** Two posts, a lintel and a hanging lantern flanking a gate gap at angle `a`. */
-function gate(c: Ctx, cx: number, cz: number, R: number, a: number, gateHalf: number, tall: number, post: RGB, lintel: RGB, glow: RGB) {
-  const side = Math.PI / 2
-  const gx = cx + Math.cos(a) * R
-  const gz = cz + Math.sin(a) * R
-  const hw = gateHalf * R
-  const tx = -Math.sin(a)
-  const tz = Math.cos(a)
-  const f = new Frame(c, gx, gz, Math.atan2(-tz, tx) + side)
-  // local x now runs along the radius; use world offsets directly for the posts
+/** Two posts, a lintel and a hanging lantern flanking a gate gap (a = outward normal angle). */
+function gate(c: Ctx, g: GateDef, hw: number, tall: number, post: RGB, lintel: RGB, glow: RGB) {
+  const tx = -Math.sin(g.a)
+  const tz = Math.cos(g.a)
   for (const s of [-1, 1]) {
-    const px = gx + tx * hw * s
-    const pz = gz + tz * hw * s
-    const g = heightAt(px, pz)
-    c.cyl(px, g + tall / 2 - 0.1, pz, 0.22, tall, post, 0)
-    c.sphere(px, g + tall, pz, 0.28, 0.2, 0.28, lintel, 0, 0)
+    const px = g.x + tx * hw * s
+    const pz = g.z + tz * hw * s
+    const gr = heightAt(px, pz)
+    c.cyl(px, gr + tall / 2 - 0.1, pz, 0.22, tall, post, 0)
+    c.sphere(px, gr + tall, pz, 0.28, 0.2, 0.28, lintel, 0, 0)
     c.col(px, pz, 0.35)
   }
-  const gy = heightAt(gx, gz)
-  c.box(gx, gy + tall - 0.1, gz, hw * 2 + 0.5, 0.2, 0.22, Math.atan2(-tz, tx), lintel, 0)
-  c.sphere(gx, gy + tall - 0.55, gz, 0.12, 0.16, 0.12, glow, 0, 2.0)
-  void f
+  const gy = heightAt(g.x, g.z)
+  c.box(g.x, gy + tall - 0.1, g.z, hw * 2 + 0.5, 0.2, 0.22, Math.atan2(-tz, tx), lintel, 0)
+  c.sphere(g.x, gy + tall - 0.55, g.z, 0.12, 0.16, 0.12, glow, 0, 2.0)
+}
+
+/** Round corner tower with a conical or domed roof. */
+function turret(c: Ctx, x: number, z: number, h: number, wall: RGB, roof: RGB, dome = false) {
+  const g = heightAt(x, z)
+  c.cyl(x, g + h / 2 - 0.2, z, 1.2, h + 0.4, wall, 0.4)
+  c.cyl(x, g + h + 0.1, z, 1.45, 0.3, [wall[0] * 0.9, wall[1] * 0.9, wall[2] * 0.9], 0.2)
+  if (dome) c.sphere(x, g + h + 0.35, z, 1.35, 0.95, 1.35, roof, 0, 0)
+  else c.cone(x, g + h + 1.1, z, 1.55, 1.9, roof)
+  c.sphere(x, g + h * 0.7, z, 0.14, 0.2, 0.14, LAMP, 0, 1.8)
+  c.col(x, z, 1.5)
+}
+
+/** Continuous road: overlapping flat slabs that follow the ground, no stepping stones. */
+function road(c: Ctx, pts: Pt[], width: number, color: RGB, closed = false) {
+  const m = closed ? pts.length : pts.length - 1
+  let j = 0
+  for (let e = 0; e < m; e++) {
+    const [ax, az] = pts[e]
+    const [bx, bz] = pts[(e + 1) % pts.length]
+    const L = Math.hypot(bx - ax, bz - az)
+    if (L < 0.01) continue
+    const n = Math.max(1, Math.ceil(L / 1.5))
+    const yaw = Math.atan2(-(bz - az), bx - ax)
+    for (let k = 0; k < n; k++) {
+      const t = (k + 0.5) / n
+      const mx = ax + (bx - ax) * t
+      const mz = az + (bz - az) * t
+      const sh = 1 - (j++ % 3) * 0.025
+      c.box(mx, heightAt(mx, mz) + 0.05, mz, L / n + 0.3, 0.1, width, yaw, [color[0] * sh, color[1] * sh, color[2] * sh], 0)
+    }
+  }
+}
+
+/** Gently winding polyline between two points (ends stay exact). */
+function wander(x0: number, z0: number, x1: number, z1: number, amp: number, n: number, phase = 0): Pt[] {
+  const L = Math.hypot(x1 - x0, z1 - z0) || 1
+  const px = -(z1 - z0) / L
+  const pz = (x1 - x0) / L
+  const out: Pt[] = []
+  for (let i = 0; i <= n; i++) {
+    const t = i / n
+    const off = amp * Math.sin(t * Math.PI) * Math.sin(t * Math.PI * 2 + phase)
+    out.push([x0 + (x1 - x0) * t + px * off, z0 + (z1 - z0) * t + pz * off])
+  }
+  return out
+}
+
+/** Plank walkway with side posts. */
+function boardwalk(c: Ctx, pts: Pt[], width: number) {
+  road(c, pts, width, [0.43, 0.31, 0.19])
+  for (let i = 0; i < pts.length; i++) {
+    const [x, z] = pts[i]
+    const [ax, az] = pts[Math.max(0, i - 1)]
+    const [bx, bz] = pts[Math.min(pts.length - 1, i + 1)]
+    const L = Math.hypot(bx - ax, bz - az) || 1
+    const nx = -(bz - az) / L
+    const nz = (bx - ax) / L
+    for (const s of [-1, 1]) {
+      const px = x + nx * (width / 2 + 0.05) * s
+      const pz = z + nz * (width / 2 + 0.05) * s
+      c.cyl(px, heightAt(px, pz) + 0.3, pz, 0.07, 0.6, WOOD_DARK, 1)
+    }
+  }
 }
 
 // ---- village styles --------------------------------------------------------------------------
@@ -1028,68 +1137,348 @@ function yardProp(c: Ctx, st: VStyle, x: number, z: number, rng: () => number) {
   }
 }
 
-function village(c: Ctx) {
-  const rng = c.rng
-  const cx = c.site.x
-  const cz = c.site.z
-  const biome = biomeAt(cx, cz)
-  const st = STYLES[biome] ?? STYLES[B.Grass]
-  const plaza = new Frame(c, cx, cz, c.yaw)
-  // plaza: two stacked discs, then the centrepiece
-  c.cyl(cx, plaza.gy + 0.04, cz, 5.8, 0.1, st.floor, 0)
-  c.cyl(cx, plaza.gy + 0.07, cz, 3.4, 0.1, st.floor2, 0)
-  st.centre(plaza, rng)
-  for (let i = 0; i < 4; i++) {
-    const a = (i / 4) * Math.PI * 2 + Math.PI / 4
-    lamp(new Frame(c, cx + Math.cos(a) * 4.8, cz + Math.sin(a) * 4.8, 0), st.lamp, st.lampTint)
+// ---- village layouts -------------------------------------------------------------------------
+/** Round or square plaza plus the biome's centrepiece. */
+function plaza(c: Ctx, st: VStyle, R: number, square = false): Frame {
+  const { x: cx, z: cz } = c.site
+  const f = new Frame(c, cx, cz, c.yaw)
+  if (square) {
+    c.box(cx, f.gy + 0.05, cz, R * 2, 0.1, R * 2, c.yaw, st.floor, 0)
+    c.box(cx, f.gy + 0.08, cz, R * 1.35, 0.1, R * 1.35, c.yaw, st.floor2, 0)
+  } else {
+    c.disc(cx, f.gy + 0.04, cz, R, 0.1, st.floor)
+    c.disc(cx, f.gy + 0.07, cz, R * 0.58, 0.1, st.floor2)
   }
+  st.centre(f, c.rng)
+  return f
+}
 
-  // houses around the plaza, each turned so its door faces the centre
-  const n = 7
-  const start = rng() * Math.PI * 2
-  const order = st.houses.slice(0, n)
-  const angles: number[] = []
+function lampRing(c: Ctx, st: VStyle, r: number, n: number, phase: number) {
   for (let i = 0; i < n; i++) {
-    const a = start + (i / n) * Math.PI * 2 + (rng() - 0.5) * 0.12
+    const a = phase + (i / n) * TAU
+    lamp(new Frame(c, c.site.x + Math.cos(a) * r, c.site.z + Math.sin(a) * r, 0), st.lamp, st.lampTint)
+  }
+}
+
+/** A house whose door faces (tx, tz). */
+function house(c: Ctx, st: VStyle, i: number, x: number, z: number, tx: number, tz: number, rng: () => number) {
+  st.houses[i % st.houses.length](new Frame(c, x, z, Math.atan2(tx - x, tz - z)), rng)
+}
+
+/** Short lane from a house door to a target on the road or plaza. */
+function lane(c: Ctx, st: VStyle, x: number, z: number, tx: number, tz: number, w = 1.5) {
+  const d = Math.hypot(tx - x, tz - z) || 1
+  const k = Math.min(2.6 / d, 0.5)
+  road(c, [[x + (tx - x) * k, z + (tz - z) * k], [tx, tz]], w, st.path)
+}
+
+function stallAt(c: Ctx, st: VStyle, x: number, z: number, tx: number, tz: number, rng: () => number) {
+  stall(new Frame(c, x, z, Math.atan2(tx - x, tz - z)), rng, st.stalls)
+}
+
+function gateAtLocal(c: Ctx, lx: number, lz: number, dx: number, dz: number): GateDef {
+  const [x, z] = c.w(lx, lz)
+  const [ox, oz] = c.w(lx + dx, lz + dz)
+  return { x, z, a: Math.atan2(oz - z, ox - x) }
+}
+
+function logPile(f: Frame) {
+  for (let i = 0; i < 3; i++) f.log(i * 0.34 - 0.34, 0.24, 0, 0.22, 2.8, i % 2 ? LOG_A : LOG_B, 0)
+  for (let i = 0; i < 2; i++) f.log(i * 0.34 - 0.17, 0.62, 0, 0.22, 2.8, i ? LOG_B : LOG_A, 0)
+  f.col(0, 0, 1.4)
+}
+
+interface RingOpts {
+  plazaR: number
+  n: number
+  rMin: number
+  rMax: number
+  jitter: number
+  fenceR: number
+  wob: number
+  gates: number
+  step: number
+  ringRoad?: number
+  curve: number
+  extra: 'windmill' | 'logs' | 'none'
+}
+
+/** Houses in a ring around a round plaza, a (possibly lumpy) round fence, roads out through the gates. */
+function ringVillage(c: Ctx, st: VStyle, o: RingOpts) {
+  const rng = c.rng
+  const { x: cx, z: cz } = c.site
+  plaza(c, st, o.plazaR)
+  lampRing(c, st, o.plazaR - 1.0, 4, Math.PI / 4)
+  if (o.ringRoad) road(c, polyPts(cx, cz, () => o.ringRoad!, 40), 1.8, st.path, true)
+
+  const start = rng() * TAU
+  const angles: number[] = []
+  for (let i = 0; i < o.n; i++) {
+    const a = start + (i / o.n) * TAU + (rng() - 0.5) * o.jitter
     angles.push(a)
-    const r = 10.8 + rng() * 1.8
+    const r = o.rMin + rng() * (o.rMax - o.rMin)
     const hx = cx + Math.cos(a) * r
     const hz = cz + Math.sin(a) * r
-    const f = new Frame(c, hx, hz, Math.atan2(cx - hx, cz - hz))
-    order[i](f, rng)
-    // path from plaza to door
-    for (let s = 0; s < 4; s++) {
-      const t = 0.18 + s * 0.15
-      const px = cx + (hx - cx) * (1 - t)
-      const pz = cz + (hz - cz) * (1 - t)
-      c.cyl(px, heightAt(px, pz) + 0.05, pz, 0.9, 0.08, st.path, 0)
-    }
+    house(c, st, i, hx, hz, cx, cz, rng)
+    const lr = o.ringRoad ?? o.plazaR - 0.4
+    lane(c, st, hx, hz, cx + Math.cos(a) * lr, cz + Math.sin(a) * lr)
     yardProp(c, st, hx + Math.cos(a + 0.55) * 3.1, hz + Math.sin(a + 0.55) * 3.1, rng)
   }
-
-  // gaps between neighbouring houses: stalls on the plaza rim, a landmark on the outskirts, gates in the fence
-  const mid = (i: number) => (angles[i % n] + angles[(i + 1) % n] + (i % n === n - 1 ? Math.PI * 2 : 0)) / 2
-  for (const k of [2, 4]) {
-    const a = mid(k)
-    stall(new Frame(c, cx + Math.cos(a) * 6.4, cz + Math.sin(a) * 6.4, Math.atan2(-Math.cos(a), -Math.sin(a))), rng, st.stalls)
+  const gap = (i: number) => {
+    const a0 = angles[i % o.n]
+    let a1 = angles[(i + 1) % o.n]
+    if (a1 < a0) a1 += TAU
+    return (a0 + a1) / 2
   }
-  const outer = mid(1)
-  if (st.windmill) windmill(new Frame(c, cx + Math.cos(outer) * 15.6, cz + Math.sin(outer) * 15.6, Math.atan2(-Math.cos(outer), -Math.sin(outer))))
-  if (st.tower) watchtower(new Frame(c, cx + Math.cos(outer) * 15.2, cz + Math.sin(outer) * 15.2, Math.atan2(-Math.cos(outer), -Math.sin(outer))))
+  const gateIdx = Array.from({ length: o.gates }, (_, g) => Math.floor((g * o.n) / o.gates))
+  const others = Array.from({ length: o.n }, (_, i) => i).filter((i) => !gateIdx.includes(i))
+  const facing = (a: number) => Math.atan2(-Math.cos(a), -Math.sin(a))
 
-  const R = 18.4
-  const gateAngles = [mid(0), mid(3), mid(5)]
-  const gateHalf = 1.7 / R
-  ringFence(c, cx, cz, R, st.fence, gateAngles, gateHalf, 1.3)
-  for (const a of gateAngles) {
-    gate(c, cx, cz, R, a, gateHalf, st.gateTall, st.gatePost, st.gateLintel, st.lampTint ?? LAMP)
-    // road from the plaza rim out through the gate
-    for (let d = 7; d < R + 2.5; d += 1.4) {
-      const px = cx + Math.cos(a) * d
-      const pz = cz + Math.sin(a) * d
-      c.cyl(px, heightAt(px, pz) + 0.05, pz, 0.85, 0.08, st.path, 0)
+  let k = 0
+  if (o.extra === 'windmill') {
+    const a = gap(others[k++])
+    windmill(new Frame(c, cx + Math.cos(a) * 15.6, cz + Math.sin(a) * 15.6, facing(a)))
+  }
+  if (o.extra === 'logs') {
+    for (let j = 0; j < 2 && k < others.length; j++) {
+      const a = gap(others[k++])
+      logPile(new Frame(c, cx + Math.cos(a) * 14.2, cz + Math.sin(a) * 14.2, facing(a) + Math.PI / 2))
     }
   }
+  for (let j = 0; j < 2 && k < others.length; j++) {
+    const a = gap(others[k++])
+    stall(new Frame(c, cx + Math.cos(a) * (o.plazaR + 0.8), cz + Math.sin(a) * (o.plazaR + 0.8), facing(a)), rng, st.stalls)
+  }
+
+  const p1 = rng() * TAU
+  const p2 = rng() * TAU
+  const shape = (a: number) => o.fenceR * (1 + o.wob * (0.6 * Math.sin(3 * a + p1) + 0.4 * Math.sin(5 * a + p2)))
+  const fence = polyPts(cx, cz, shape, Math.round((TAU * o.fenceR) / o.step))
+  const gates: GateDef[] = gateIdx.map((i) => {
+    const a = gap(i)
+    return { x: cx + Math.cos(a) * shape(a), z: cz + Math.sin(a) * shape(a), a }
+  })
+  fenceLine(c, fence, st.fence, gates, 1.7, o.step)
+  for (const g of gates) {
+    gate(c, g, 1.7, st.gateTall, st.gatePost, st.gateLintel, st.lampTint ?? LAMP)
+    const rim = o.plazaR * 0.9
+    road(c, wander(cx + Math.cos(g.a) * rim, cz + Math.sin(g.a) * rim, g.x + Math.cos(g.a) * 2.8, g.z + Math.sin(g.a) * 2.8, o.curve, 10, g.a), 2.1, st.path)
+  }
+  c.setCircle(o.fenceR * (1 - o.wob) - 1.2)
+}
+
+/** Desert: a walled square, two crossing streets, houses fronting the streets, four corner towers. */
+function desertVillage(c: Ctx, st: VStyle) {
+  const rng = c.rng
+  const hw = 12.6
+  road(c, [c.w(-hw - 2.5, 0), c.w(hw + 2.5, 0)], 2.8, st.path)
+  road(c, [c.w(0, -hw - 2.5), c.w(0, hw + 2.5)], 2.8, st.path)
+  plaza(c, st, 4.4, true)
+  lampRing(c, st, 4.9, 4, Math.PI / 4)
+  const spots: Pt[] = [[8, 5], [8, -5], [-8, 5], [-8, -5], [5, 8.6], [-5, 8.6], [5, -8.6], [-5, -8.6]]
+  spots.forEach(([lx, lz], i) => {
+    const [x, z] = c.w(lx, lz)
+    const [tx, tz] = Math.abs(lx) > Math.abs(lz) ? c.w(lx, 0) : c.w(0, lz)
+    house(c, st, i, x, z, tx, tz, rng)
+    const [yx, yz] = c.w(lx + Math.sign(lx) * (Math.abs(lx) > Math.abs(lz) ? 3.3 : 0.2), lz + Math.sign(lz) * (Math.abs(lx) > Math.abs(lz) ? 0.2 : 3.3))
+    yardProp(c, st, yx, yz, rng)
+  })
+  for (const [lx, lz] of [[-6.6, -2.4], [6.6, 2.4]] as Pt[]) {
+    const [x, z] = c.w(lx, lz)
+    const [tx, tz] = c.w(lx, 0)
+    stallAt(c, st, x, z, tx, tz, rng)
+  }
+  const corners: Pt[] = [[-hw, -hw], [hw, -hw], [hw, hw], [-hw, hw]]
+  const gates = [gateAtLocal(c, hw, 0, 1, 0), gateAtLocal(c, -hw, 0, -1, 0), gateAtLocal(c, 0, hw, 0, 1), gateAtLocal(c, 0, -hw, 0, -1)]
+  fenceLine(c, corners.map(([lx, lz]) => c.w(lx, lz)), st.fence, gates, 1.9, 1.3)
+  for (const g of gates) gate(c, g, 1.7, st.gateTall, st.gatePost, st.gateLintel, st.lampTint ?? LAMP)
+  for (const [lx, lz] of corners) {
+    const [x, z] = c.w(lx, lz)
+    turret(c, x, z, 4.4, [0.86, 0.72, 0.48], [0.9, 0.78, 0.55], true)
+  }
+  c.setRect(hw - 0.9, hw - 0.9)
+}
+
+/** Mountain: a stone fortress, long avenue lined with chalets, obelisk plaza, watchtowers and corner turrets. */
+function mountainVillage(c: Ctx, st: VStyle) {
+  const rng = c.rng
+  const hw = 10
+  const hd = 14
+  road(c, [c.w(0, -hd - 2.5), c.w(0, hd + 2.5)], 2.8, st.path)
+  const [px, pz] = c.w(0, 2)
+  const f = new Frame(c, px, pz, c.yaw)
+  c.disc(px, f.gy + 0.04, pz, 4.2, 0.1, st.floor)
+  c.disc(px, f.gy + 0.07, pz, 2.5, 0.1, st.floor2)
+  st.centre(f, rng)
+  for (const [lx, lz] of [[-3.4, -1.2], [3.4, -1.2], [-3.4, 5.2], [3.4, 5.2]] as Pt[]) {
+    const [x, z] = c.w(lx, lz)
+    lamp(new Frame(c, x, z, 0), st.lamp, st.lampTint)
+  }
+  const rows = [-10, -4.8, 0.6, 6.2]
+  let i = 0
+  for (const side of [-1, 1]) {
+    for (const lz of rows) {
+      const lx = side * 7.2
+      const [x, z] = c.w(lx, lz)
+      const [tx, tz] = c.w(0, lz)
+      house(c, st, i++, x, z, tx, tz, rng)
+      lane(c, st, x, z, tx, tz, 1.4)
+      const [yx, yz] = c.w(lx + side * 2.5, lz + 2.8)
+      yardProp(c, st, yx, yz, rng)
+    }
+  }
+  for (const side of [-1, 1]) {
+    const [x, z] = c.w(side * 6.8, 11.4)
+    const [ax, az] = c.w(0, 11.4)
+    watchtower(new Frame(c, x, z, Math.atan2(ax - x, az - z)))
+  }
+  const [sx, sz] = c.w(-3.3, -8.2)
+  const [stx, stz] = c.w(0, -8.2)
+  stallAt(c, st, sx, sz, stx, stz, rng)
+  const corners: Pt[] = [[-hw, -hd], [hw, -hd], [hw, hd], [-hw, hd]]
+  const gates = [gateAtLocal(c, 0, -hd, 0, -1), gateAtLocal(c, 0, hd, 0, 1)]
+  fenceLine(c, corners.map(([lx, lz]) => c.w(lx, lz)), st.fence, gates, 2.0, 1.3)
+  for (const g of gates) gate(c, g, 1.9, st.gateTall + 0.6, st.gatePost, st.gateLintel, st.lampTint ?? LAMP)
+  for (const [lx, lz] of corners) {
+    const [x, z] = c.w(lx, lz)
+    turret(c, x, z, 4.8, [0.52, 0.5, 0.47], [0.3, 0.34, 0.42])
+  }
+  c.setRect(hw - 0.9, hd - 0.9)
+}
+
+/** Tropical: a long street through an oval bamboo stockade, stilt huts both sides, totem plaza in the middle. */
+function tropicalVillage(c: Ctx, st: VStyle) {
+  const rng = c.rng
+  const rx = 17.2
+  const rz = 12.4
+  const bend = (lx: number) => Math.sin(lx * 0.22) * 1.5
+  const street: Pt[] = []
+  for (let lx = -rx - 2.5; lx <= rx + 2.5; lx += 2.2) street.push(c.w(lx, bend(lx)))
+  road(c, street, 2.6, st.path)
+  plaza(c, st, 4.4)
+  lampRing(c, st, 3.6, 4, Math.PI / 4)
+  const xs = [-12.6, -7.4, 7.4, 12.6]
+  let i = 0
+  for (const side of [-1, 1]) {
+    for (const lx of xs) {
+      const lz = side * (6.6 + (i % 2) * 1.5)
+      const [x, z] = c.w(lx, lz)
+      const [tx, tz] = c.w(lx, bend(lx) + side * 1.3)
+      house(c, st, i++, x, z, tx, tz, rng)
+      boardwalk(c, wander(...c.w(lx, bend(lx) + side * 1.3), ...c.w(lx + 0.0, lz - side * 2.6), 0.5, 3, i), 1.3)
+      const [yx, yz] = c.w(lx + 3.1, lz)
+      yardProp(c, st, yx, yz, rng)
+    }
+  }
+  for (const side of [-1, 1]) {
+    const [x, z] = c.w(side * 1.0, side * 5.4 + bend(0))
+    const [tx, tz] = c.w(side * 1.0, bend(0))
+    stallAt(c, st, x, z, tx, tz, rng)
+  }
+  const oval: Pt[] = []
+  const n = 76
+  for (let k = 0; k < n; k++) {
+    const t = (k / n) * TAU
+    oval.push(c.w(Math.cos(t) * rx, Math.sin(t) * rz))
+  }
+  const gates = [gateAtLocal(c, rx, bend(rx), 1, 0), gateAtLocal(c, -rx, bend(-rx), -1, 0)]
+  fenceLine(c, oval, st.fence, gates, 1.9, 1.3)
+  for (const g of gates) gate(c, g, 1.7, st.gateTall, st.gatePost, st.gateLintel, st.lampTint ?? LAMP)
+  c.setEllipse(rx - 1.2, rz - 1.2)
+}
+
+/** Swamp: huts scattered at odd distances, plank boardwalks instead of roads, a broken reed fence. */
+function swampVillage(c: Ctx, st: VStyle) {
+  const rng = c.rng
+  const { x: cx, z: cz } = c.site
+  const f = new Frame(c, cx, cz, c.yaw)
+  c.disc(cx, f.gy + 0.04, cz, 3.8, 0.1, st.floor)
+  st.centre(f, rng)
+  lampRing(c, st, 4.4, 3, 0.4)
+  const start = rng() * TAU
+  const n = 7
+  const angles: number[] = []
+  for (let i = 0; i < n; i++) {
+    const a = start + (i / n) * TAU + (rng() - 0.5) * 0.7
+    angles.push(a)
+    const r = 8 + rng() * 6
+    const hx = cx + Math.cos(a) * r
+    const hz = cz + Math.sin(a) * r
+    house(c, st, i, hx, hz, cx, cz, rng)
+    const sx = hx + (cx - hx) * 0.2
+    const sz = hz + (cz - hz) * 0.2
+    boardwalk(c, wander(sx, sz, cx + Math.cos(a) * 3.6, cz + Math.sin(a) * 3.6, 1.6, Math.max(3, Math.round(r / 1.9)), i), 1.4)
+    yardProp(c, st, hx + Math.cos(a + 1.1) * 3.2, hz + Math.sin(a + 1.1) * 3.2, rng)
+  }
+  const p1 = rng() * TAU
+  const p2 = rng() * TAU
+  const R = 17.2
+  const shape = (a: number) => R * (1 + 0.07 * (0.6 * Math.sin(3 * a + p1) + 0.4 * Math.sin(5 * a + p2)))
+  const gates: GateDef[] = [0, 2, 4].map((i) => {
+    const a = (angles[i] + angles[i + 1]) / 2
+    return { x: cx + Math.cos(a) * shape(a), z: cz + Math.sin(a) * shape(a), a }
+  })
+  fenceLine(c, polyPts(cx, cz, shape, 70), st.fence, gates, 2.0, 1.3, 0.16)
+  for (const g of gates) {
+    gate(c, g, 1.9, st.gateTall, st.gatePost, st.gateLintel, st.lampTint ?? LAMP)
+    boardwalk(c, wander(cx + Math.cos(g.a) * 4.4, cz + Math.sin(g.a) * 4.4, g.x + Math.cos(g.a) * 2.6, g.z + Math.sin(g.a) * 2.6, 2.0, 9, g.a), 1.6)
+  }
+  const a = (angles[5] + angles[6]) / 2
+  stall(new Frame(c, cx + Math.cos(a) * 6.2, cz + Math.sin(a) * 6.2, Math.atan2(-Math.cos(a), -Math.sin(a))), rng, st.stalls)
+  c.setCircle(R * 0.93 - 1.0)
+}
+
+/** Magical: six crystal houses in a hexagon, a ring road and six spokes, a hedge circle with spire groves. */
+function magicalVillage(c: Ctx, st: VStyle) {
+  const rng = c.rng
+  const { x: cx, z: cz } = c.site
+  const off = rng() * TAU
+  const hAng = (i: number) => off + (i / 6) * TAU
+  const sAng = (i: number) => off + ((i + 0.5) / 6) * TAU
+  road(c, polyPts(cx, cz, () => 7.3, 44), 1.7, st.path, true)
+  for (let i = 0; i < 6; i++) {
+    const a = sAng(i)
+    const reach = i % 2 === 0 ? 20.4 : 12.8
+    road(c, [[cx + Math.cos(a) * 4.0, cz + Math.sin(a) * 4.0], [cx + Math.cos(a) * reach, cz + Math.sin(a) * reach]], 2.0, st.path)
+  }
+  plaza(c, st, 4.6)
+  for (let i = 0; i < 6; i++) {
+    const a = hAng(i)
+    const hx = cx + Math.cos(a) * 10.8
+    const hz = cz + Math.sin(a) * 10.8
+    house(c, st, i, hx, hz, cx, cz, rng)
+    lane(c, st, hx, hz, cx + Math.cos(a) * 7.3, cz + Math.sin(a) * 7.3, 1.3)
+    lamp(new Frame(c, cx + Math.cos(a) * 7.3 + Math.cos(a + 1.57) * 1.5, cz + Math.sin(a) * 7.3 + Math.sin(a + 1.57) * 1.5, 0), st.lamp, st.lampTint)
+    crystalSpire(new Frame(c, cx + Math.cos(a) * 16.2, cz + Math.sin(a) * 16.2, rng() * 6), rng, 3, 0.9)
+    yardProp(c, st, hx + Math.cos(a + 0.7) * 3.4, hz + Math.sin(a + 0.7) * 3.4, rng)
+  }
+  const R = 18.7
+  const gates: GateDef[] = [0, 2, 4].map((i) => ({ x: cx + Math.cos(sAng(i)) * R, z: cz + Math.sin(sAng(i)) * R, a: sAng(i) }))
+  fenceLine(c, polyPts(cx, cz, () => R, Math.round((TAU * R) / 1.3)), st.fence, gates, 1.9, 1.3)
+  for (const g of gates) gate(c, g, 1.7, st.gateTall, st.gatePost, st.gateLintel, st.lampTint ?? LAMP)
+  for (const i of [1, 3, 5]) {
+    const a = sAng(i)
+    const sf = new Frame(c, cx + Math.cos(a) * 14.6, cz + Math.sin(a) * 14.6, 0)
+    crystalSpire(sf, rng, 5, 1.2)
+  }
+  c.setCircle(R - 1.4)
+}
+
+const LAYOUTS: Record<number, (c: Ctx, st: VStyle) => void> = {
+  [B.Grass]: (c, st) => ringVillage(c, st, { plazaR: 5.8, n: 7, rMin: 10.8, rMax: 12.6, jitter: 0.12, fenceR: 18.4, wob: 0, gates: 3, step: 1.3, ringRoad: 8.2, curve: 0, extra: 'windmill' }),
+  [B.Forest]: (c, st) => ringVillage(c, st, { plazaR: 4.6, n: 6, rMin: 9.4, rMax: 13.6, jitter: 0.4, fenceR: 17.4, wob: 0.05, gates: 2, step: 1.1, curve: 1.6, extra: 'logs' }),
+  [B.Snow]: (c, st) => ringVillage(c, st, { plazaR: 4.2, n: 6, rMin: 8.4, rMax: 9.8, jitter: 0.1, fenceR: 15.2, wob: 0, gates: 2, step: 1.2, ringRoad: 6.4, curve: 0.8, extra: 'none' }),
+  [B.Desert]: desertVillage,
+  [B.Mountain]: mountainVillage,
+  [B.Tropical]: tropicalVillage,
+  [B.Swamp]: swampVillage,
+  [B.Magical]: magicalVillage,
+}
+
+function village(c: Ctx) {
+  const biome = biomeAt(c.site.x, c.site.z)
+  const st = STYLES[biome] ?? STYLES[B.Grass]
+  ;(LAYOUTS[biome] ?? LAYOUTS[B.Grass])(c, st)
 }
 
 // ------------------------------------------------------------------------------------------------ camp
@@ -1099,16 +1488,16 @@ function camp(c: Ctx) {
   const cz = c.site.z
   const rng = c.rng
   const gy = heightAt(cx, cz)
-  c.cyl(cx, gy + 0.04, cz, 7.2, 0.1, [0.52, 0.42, 0.3], 0)
-  c.cyl(cx, gy + 0.07, cz, 4.6, 0.1, [0.46, 0.37, 0.26], 0)
+  c.disc(cx, gy + 0.04, cz, 7.2, 0.1, [0.52, 0.42, 0.3])
+  c.disc(cx, gy + 0.07, cz, 4.6, 0.1, [0.46, 0.37, 0.26])
   const fire = new Frame(c, cx, cz, c.yaw)
   // fire ring (the animated flames live in CampFire.tsx)
   for (let i = 0; i < 10; i++) {
     const a = (i / 10) * Math.PI * 2
     fire.box(Math.cos(a) * 1.1, 0.16, Math.sin(a) * 1.1, 0.46, 0.32, 0.4, i % 2 ? [0.55, 0.53, 0.5] : [0.46, 0.44, 0.42])
   }
-  fire.cyl(0, 0.12, 0, 0.85, 0.1, [0.12, 0.08, 0.06])
-  fire.cyl(0, 0.2, 0, 0.55, 0.06, [1, 0.45, 0.1], 1.6)
+  fire.disc(0, 0.12, 0, 0.85, 0.1, [0.12, 0.08, 0.06])
+  fire.disc(0, 0.2, 0, 0.55, 0.06, [1, 0.45, 0.1], 1.6)
   for (let i = 0; i < 3; i++) fire.log(0, 0.3 + i * 0.1, 0, 0.1, 1.4, LOG_B, (i / 3) * Math.PI)
   fire.col(0, 0, 1.3)
   // log seats around the fire (the tent side stays open)
@@ -1214,7 +1603,7 @@ export function siteGeometry(site: Site): SiteGeometry {
     // cottages & courts face the camera (+z) roughly; circles / shrines are rotationally free
     const c = new Ctx(site, site.type === 'cottage' || site.type === 'cottageRuin' || site.type === 'ruinCourt' ? ((hashInts(site.x, site.z) % 100) / 100 - 0.5) * 0.5 : yaw)
     GEN[site.type](c)
-    g = { parts: c.parts, cols: c.cols }
+    g = { parts: c.parts, cols: c.cols, inside: c.inside }
     cache.set(key, g)
   }
   return g

@@ -18,6 +18,7 @@ import { AudioDriver } from '../audio/AudioDriver'
 import { World } from '../world/World'
 import { CAMERA, QUALITY, SKY_COLOR } from './config'
 import { AdaptiveRes } from './AdaptiveRes'
+import { PixelMode } from '../atmosphere/PixelMode'
 import { useSettings } from './store'
 
 export function Game() {
@@ -50,6 +51,7 @@ export function Game() {
       <NpcBubbleDriver />
       {q.godRays && <GodRays />}
       <AdaptiveRes max={Math.min(q.dpr, typeof window === 'undefined' ? 1 : window.devicePixelRatio)} />
+      <PixelMode />
       <Pollen />
       <Effects />
     </Canvas>

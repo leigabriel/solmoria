@@ -17,9 +17,27 @@ function initialQuality(): Quality {
   return coarse && Math.min(innerWidth, innerHeight) < 900 ? 'low' : 'medium'
 }
 
+export type PixelMode = 'off' | 'fine' | 'chunky'
+const PIX_KEY = 'solmoria.pixel'
+
+function initialPixel(): PixelMode {
+  const forced = typeof location !== 'undefined' ? new URLSearchParams(location.search).get('pixel') : null
+  if (forced === 'off' || forced === 'fine' || forced === 'chunky') return forced
+  try {
+    const saved = localStorage.getItem(PIX_KEY)
+    if (saved === 'off' || saved === 'fine' || saved === 'chunky') return saved
+  } catch {
+    /* storage may be unavailable */
+  }
+  return 'off'
+}
+
 interface Settings {
   quality: Quality
   setQuality: (q: Quality) => void
+  /** pixel-art look: low internal resolution scaled up with nearest-neighbour, blocky terrain texture, palette dither */
+  pixel: PixelMode
+  setPixel: (p: PixelMode) => void
 }
 
 export const useSettings = create<Settings>((set) => ({
@@ -31,6 +49,15 @@ export const useSettings = create<Settings>((set) => ({
       /* ignore */
     }
     set({ quality })
+  },
+  pixel: initialPixel(),
+  setPixel: (pixel) => {
+    try {
+      localStorage.setItem(PIX_KEY, pixel)
+    } catch {
+      /* ignore */
+    }
+    set({ pixel })
   },
 }))
 

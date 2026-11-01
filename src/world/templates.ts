@@ -75,6 +75,7 @@ const T = template
 export const TPL = {
   box: T(new THREE.BoxGeometry(1, 1, 1)),
   cyl: T(new THREE.CylinderGeometry(1, 1, 1, 8)),
+  disc: T(new THREE.CylinderGeometry(1, 1, 1, 32)),
   trunk: T(new THREE.CylinderGeometry(0.62, 1, 1, 6).translate(0, 0.5, 0)),
   cone: T(new THREE.ConeGeometry(1, 1, 8).translate(0, 0.5, 0)),
   coneDown: T(new THREE.ConeGeometry(1, 1, 5).rotateX(Math.PI).translate(0, -0.5, 0)),

@@ -24,6 +24,7 @@ html, body, #root {
   font-family: var(--font);
 }
 canvas { display: block; touch-action: none; }
+html.px canvas { image-rendering: pixelated; image-rendering: crisp-edges; image-rendering: pixelated; }
 
 /* drifting edge mist, like the haze that rolls over the screen edges in the reference */
 .mist {

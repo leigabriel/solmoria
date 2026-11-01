@@ -21,7 +21,7 @@ npm run build      # type-check + production build
 | `Shift` | Walk |
 | Touch + drag (left side of screen) | Dynamic joystick, light push walks, full push runs |
 
-Quality (low / medium / high) is in the top-right corner and is remembered between visits.
+Quality (low / medium / high) is in the top-right corner and is remembered between visits. Menu > Settings also has a Pixel art switch (off / fine / chunky): low internal resolution scaled up with nearest-neighbour, blocky terrain texture and a dithered limited palette. `?pixel=fine` forces it from the URL.
 
 ## Structure
 
@@ -99,17 +99,19 @@ The cavern is an open-roof sunken bowl: the terrain is a heightfield, so it cann
 
 There are eight villages, one per biome, each with its own look (`src/world/structures.ts`):
 
-| Biome | Houses | Plaza | Wall |
-| --- | --- | --- | --- |
-| Grassland | thatch cottages, mushroom houses, towers, hobbit holes, windmill | well | picket fence |
-| Forest | log cabins | bonfire | log palisade |
-| Desert | adobe houses with awnings | oasis with palms | sandstone wall with domed towers |
-| Snow | A-frame cabins and igloos | bonfire | snow-capped stone wall |
-| Tropical | stilt huts | totem | bamboo fence |
-| Swamp | stilt shacks | mossy well | reed fence |
-| Mountain | stone chalets, watchtower | obelisk | tall stone wall |
-| Enchanted | crystal mushroom houses and spires | crystal fountain | glowing hedge |
+Each biome has its own layout, not just its own palette:
 
-Walls are built from short segments that follow the ground, with three gates (posts, lintel and lantern) and a road out of each one. Villagers keep to a post, only choose spots they can stand on, and turn to face you when you come close.
+| Biome | Layout | Houses | Plaza | Wall |
+| --- | --- | --- | --- | --- |
+| Grassland | round plaza, ring road, spokes to three gates | thatch cottages, mushroom houses, towers, hobbit holes, windmill | well | round picket fence |
+| Forest | clearing with winding dirt roads, lumber piles | log cabins | bonfire | lumpy log palisade, two gates |
+| Desert | walled square, two crossing streets | adobe houses fronting the streets | square with oasis | sandstone wall, four domed corner towers, four gates |
+| Snow | compact ring around a fire | A-frame cabins and igloos | bonfire | small snow-capped stone ring |
+| Tropical | one long street through an oval stockade | stilt huts on both sides with boardwalk lanes | totem | bamboo oval, gates at both ends |
+| Swamp | scattered huts joined by plank boardwalks | stilt shacks | mossy well | broken reed fence |
+| Mountain | fortress with a long avenue | two rows of stone chalets, watchtowers | obelisk | tall stone rectangle, corner turrets |
+| Enchanted | hexagon of houses, ring road and six spokes | crystal mushroom houses and spires | crystal fountain | glowing hedge circle |
+
+Plazas, pools and bases are 32-sided discs and roads are continuous overlapping slabs (no stepping stones, no 8-sided blobs). Walls are short segments that follow the ground, with gates (posts, lintel and lantern). Villagers keep to the village's own walls, only choose spots they can stand on, and turn to face you when you come close.
 
 The hero starts at the camp near the centre of the map: a canvas tent, a fire ring with animated flames and light, log seats, a statue of the hero holding a glowing shard, lantern posts and a signpost. It is marked on both maps.

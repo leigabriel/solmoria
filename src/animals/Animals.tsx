@@ -61,9 +61,10 @@ export function nearestNpc(x: number, z: number, r: number) {
 
 function villagerOk(a: Animal, x: number, z: number) {
   const site = a.home!
-  if (Math.hypot(x - site.x, z - site.z) > 17.2) return false
+  const geo = siteGeometry(site)
+  if (!geo.inside(x, z)) return false
   if (depthAt(x, z) > 0.04 || slopeAt(x, z) > 0.7 || badGround(x, z)) return false
-  for (const c of siteGeometry(site).cols) if (Math.hypot(c.x - x, c.z - z) < c.r + 0.45) return false
+  for (const c of geo.cols) if (Math.hypot(c.x - x, c.z - z) < c.r + 0.45) return false
   return true
 }
 

@@ -111,6 +111,8 @@ function SettingsTab() {
   const { setMenu, volume, setVolume } = useHud()
   const quality = useSettings((s) => s.quality)
   const setQuality = useSettings((s) => s.setQuality)
+  const pixel = useSettings((s) => s.pixel)
+  const setPixel = useSettings((s) => s.setPixel)
   return (
     <>
       <label className="row">
@@ -134,6 +136,16 @@ function SettingsTab() {
           {(Object.keys(QUALITY) as Quality[]).map((q) => (
             <button key={q} className={q === quality ? 'on' : ''} onClick={() => setQuality(q)}>
               {q}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="row">
+        <span>Pixel art</span>
+        <div className="seg">
+          {(['off', 'fine', 'chunky'] as const).map((p) => (
+            <button key={p} className={p === pixel ? 'on' : ''} onClick={() => setPixel(p)}>
+              {p}
             </button>
           ))}
         </div>

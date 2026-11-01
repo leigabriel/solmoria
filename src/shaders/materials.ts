@@ -9,6 +9,8 @@ export const sharedUniforms = {
   uWindDir: { value: new THREE.Vector2(0.8, 0.6).normalize() },
   uNoise: { value: createNoiseTexture() },
   uPxPerUnit: { value: 600 },
+  /** pixel-art mode: terrain texture cells per world unit (0 = smooth) */
+  uPix: { value: 0 },
   /** coarse biome-id map (1 texel = BIOME_CELL world units), set by assets.ts once the world exists */
   uBiomeTex: { value: new THREE.DataTexture(new Uint8Array([0]), 1, 1, THREE.RedFormat) },
   uBiomeN: { value: 1 },
@@ -55,23 +57,25 @@ const PAL_ROWS = 7
 // ---------------------------------------------------------------------------------------------
 export function createTerrainMaterial() {
   const m = new THREE.MeshLambertMaterial({ color: 0xffffff })
-  m.customProgramCacheKey = () => 'solmoria-terrain-3'
+  m.customProgramCacheKey = () => 'solmoria-terrain-4'
   m.onBeforeCompile = (shader) => {
     bind(shader)
     shader.uniforms.uBiomeTex = sharedUniforms.uBiomeTex
     shader.uniforms.uBiomeN = sharedUniforms.uBiomeN
+    shader.uniforms.uPix = sharedUniforms.uPix
     shader.uniforms.uPal = { value: BIOME_PALETTE }
     shader.vertexShader = shader.vertexShader
       .replace('#include <common>', '#include <common>\nattribute float aShore;\nattribute float aAO;\nvarying float vShore;\nvarying float vAO;\nvarying vec3 vWPos;\nvarying vec3 vWN;')
       .replace('#include <begin_vertex>', '#include <begin_vertex>\nvShore = aShore; vAO = aAO; vWPos = (modelMatrix * vec4(transformed, 1.0)).xyz; vWN = normal;')
     shader.fragmentShader = shader.fragmentShader
-      .replace('#include <common>', `#include <common>\n${DECL}\nvarying float vShore;\nvarying float vAO;\nvarying vec3 vWPos;\nvarying vec3 vWN;\nuniform sampler2D uBiomeTex;\nuniform float uBiomeN;\nuniform vec3 uPal[${BIOME_COUNT * PAL_ROWS}];`)
+      .replace('#include <common>', `#include <common>\n${DECL}\nvarying float vShore;\nvarying float vAO;\nvarying vec3 vWPos;\nvarying vec3 vWN;\nuniform sampler2D uBiomeTex;\nuniform float uBiomeN;\nuniform float uPix;\nuniform vec3 uPal[${BIOME_COUNT * PAL_ROWS}];`)
       .replace(
         '#include <color_fragment>',
         /* glsl */ `
 #include <color_fragment>
 {
   vec2 p = vWPos.xz;
+  if (uPix > 0.5) p = (floor(p * uPix) + 0.5) / uPix;
   vec2 uv = p * (1.0 / 64.0);
   float wp = nB(uv * 1.7 + 0.31);
   float n1 = nR(uv + (wp - 0.5) * 0.2);

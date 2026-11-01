@@ -2,6 +2,8 @@ import { useFrame, useThree } from '@react-three/fiber'
 import { useRef } from 'react'
 import { CAMERA } from './config'
 import { sharedUniforms } from '../shaders/materials'
+import { useSettings } from './store'
+import { PIXEL_PRESETS } from './pixel'
 
 /** Keeps frame time near 60 fps by nudging the pixel ratio, and feeds the pixel-scale uniform used by mist. */
 export function AdaptiveRes({ max }: { max: number }) {
@@ -10,6 +12,14 @@ export function AdaptiveRes({ max }: { max: number }) {
   const cool = useRef(0)
   const dpr = useRef(Math.min(max, 1.25))
   useFrame((_, dt) => {
+    const px = PIXEL_PRESETS[useSettings.getState().pixel]
+    if (px) {
+      // pixel-art mode: fixed low internal resolution, no adaptation
+      const ratio = Math.min(max, Math.max(0.2, px.lines / size.height))
+      if (Math.abs(gl.getPixelRatio() - ratio) > 0.001) gl.setPixelRatio(ratio)
+      sharedUniforms.uPxPerUnit.value = (size.height * ratio) / (2 * Math.tan((CAMERA.fov * Math.PI) / 360) * CAMERA.distance)
+      return
+    }
     avg.current += (dt * 1000 - avg.current) * 0.05
     cool.current -= dt
     if (cool.current <= 0) {
